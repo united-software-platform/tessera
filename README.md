@@ -4,6 +4,7 @@
 [![версия backlog](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Funited-software-platform%2Fformular%2Fmain%2Fplugin%2Fbacklog%2F.claude-plugin%2Fplugin.json&query=%24.version&label=backlog&color=9cf)](https://github.com/united-software-platform/formular/tree/main/plugin/backlog)
 [![версия mattpocock-skills](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmattpocock%2Fskills%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=mattpocock-skills&color=9cf)](https://github.com/mattpocock/skills)
 [![openspec](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Funited-software-platform%2Ftessera%2Fmain%2Fopenspec%2Fconfig.yaml&query=schema&label=openspec&color=blueviolet)](https://github.com/united-software-platform/tessera/tree/main/openspec)
+[![openspec CLI](https://img.shields.io/npm/v/@fission-ai/openspec?label=openspec%20CLI&color=blueviolet)](https://github.com/Fission-AI/OpenSpec/releases)
 [![лицензия MIT](https://img.shields.io/badge/license-MIT-success)](https://spdx.org/licenses/MIT.html)
 
 Навыки и правила проекта tessera в формате Agent Skills; формат подключается в любой харнес,
