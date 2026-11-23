@@ -7,33 +7,9 @@
     {
       "name": "tessera-plugin",
       "source": "./plugins/tessera-plugin",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "description": "Навыки и правила tessera: документы проекта, workflow-операции, правила оформления, окружения и git-процесса — единый источник для харнесов с поддержкой плагинов",
       "displayName": "Tessera Plugin"
-    },
-    {
-      "name": "backlog",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/united-software-platform/formular.git",
-        "path": "plugin/backlog",
-        "ref": "main"
-      },
-      "version": "1.4.0",
-      "description": "Порождение и исполнение беклогов операций — зависимость навыков workflow-fast и workflow-grill",
-      "displayName": "Backlog (formular)"
-    },
-    {
-      "name": "mattpocock-skills",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/mattpocock/skills.git",
-        "path": ".",
-        "ref": "main"
-      },
-      "version": "1.3.2",
-      "description": "Навыки реального инжиниринга (grilling, spec/ticket, TDD, code review) — зависимость навыка workflow-grill",
-      "displayName": "Matt Pocock Skills"
     }
   ]
 }
