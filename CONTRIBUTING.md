@@ -42,13 +42,28 @@
 
 ## Блок бейджей
 
-| Бейдж | Источник значения | Режим | Цель ссылки |
-|-------|-------------------|-------|-------------|
-| Версия tessera-plugin | Манифест `plugins/tessera-plugin/.zcode-plugin/plugin.json` (raw-файл на `main`) | Динамический — shields `dynamic/json`, запрос `$.version` | blob-страница манифеста в этом репозитории |
-| Версия backlog | Манифест `plugin/backlog/.claude-plugin/plugin.json` репозитория formular (raw-файл на `main`) | Динамический — shields `dynamic/json`, запрос `$.version` | каталог `plugin/backlog` в репозитории formular |
-| Версия mattpocock-skills | Манифест `.claude-plugin/plugin.json` репозитория mattpocock/skills (raw-файл на `main`) | Динамический — shields `dynamic/json`, запрос `$.version` | репозиторий mattpocock/skills |
-| OpenSpec-схема | `openspec/config.yaml`, поле `schema` (raw-файл на `main`) | Динамический — shields `dynamic/yaml`, запрос `schema` | каталог `openspec` этого репозитория |
-| Лицензия MIT | Неизменная характеристика | Статический | `https://spdx.org/licenses/MIT.html` |
+Цвет бейджа кодирует его класс; легенда:
+
+| Класс | Цвет | Что означает |
+|-------|------|--------------|
+| Поставка | `blue` (#007ec6) | Идентичность главного артефакта — версия tessera-plugin |
+| Зависимость | `9cf` (светлый синий) | Чужой плагин, требуемый навыками; тише собственного |
+| Стандарт / процесс | `blueviolet` | Схема работы — openspec |
+| Право | `success` (зелёный) | Пермиссивная лицензия |
+
+Классовые цвета не пересекаются с семантикой состояний (`green`/`yellow`/`red` зарезервированы
+под «ок / внимание / проблема» — например, для будущего endpoint-бейджа состояния зависимостей).
+Новый бейдж получает класс и цвет до вставки в блок; новый класс заводится вместе со строкой
+легенды. Проверено: shields-алиас `informational` совпадает с `blue` — для класса «зависимость»
+используется `9cf`.
+
+| Бейдж | Класс | Источник значения | Режим | Цель ссылки |
+|-------|-------|-------------------|-------|-------------|
+| Версия tessera-plugin | Поставка | Манифест `plugins/tessera-plugin/.zcode-plugin/plugin.json` (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | blob-страница манифеста |
+| Версия backlog | Зависимость | Манифест `plugin/backlog/.claude-plugin/plugin.json` репозитория formular (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | каталог `plugin/backlog` в formular |
+| Версия mattpocock-skills | Зависимость | Манифест `.claude-plugin/plugin.json` репозитория mattpocock/skills (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | репозиторий mattpocock/skills |
+| OpenSpec-схема | Стандарт / процесс | `openspec/config.yaml`, поле `schema` (raw-файл на `main`) | Динамический — shields `dynamic/yaml`, запрос `schema` | каталог `openspec` этого репозитория |
+| Лицензия MIT | Право | Неизменная характеристика | Статический | `https://spdx.org/licenses/MIT.html` |
 
 Переименование манифеста или смена пути сломает динамический бейдж — носители значений
 перечислены в таблице. Значения читаются с ветки `main` GitHub.
@@ -80,3 +95,4 @@ bash scripts/bootstrap.sh                                                       
 | 1.0.3 | 2026-11-23 | Запрос пользователя: нужны версия и бейджи для formular и плагина | ZCode | GLM-5.3 | Добавлены динамические бейджи версий tessera-plugin (из манифеста этого репозитория) и backlog (из манифеста formular) через shields `dynamic/json`; карта бейджей дополнена носителями значений |
 | 1.0.4 | 2026-11-23 | Запрос пользователя: добавить зависимость mattpocock-skills | ZCode | GLM-5.3 | Добавлены бейдж версии mattpocock-skills и строка в карту бейджей; зависимости в README дополнены mattpocock-skills (навык `grilling` для workflow-grill) |
 | 1.0.5 | 2026-11-23 | Запрос пользователя: бейджи openspec и mattpocock-skills | ZCode | GLM-5.3 | Добавлен бейдж openspec-схемы (`dynamic/yaml`, поле `schema` из `openspec/config.yaml`) и строка в карту бейджей; бейдж mattpocock-skills добавлен предыдущей правкой (1.0.4) |
+| 1.0.6 | 2026-11-23 | Запрос пользователя: классификация бейджей и цвет по классу | ZCode | GLM-5.3 | Введена легенда классов (поставка `blue`, зависимость `9cf` — `informational` совпадает с `blue`, стандарт `blueviolet`, право `success`) и колонка «Класс» в карту бейджей; цвета применены в README |
