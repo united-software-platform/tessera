@@ -24,15 +24,15 @@
 | `AGENTS.md` | Точка входа правил для агентов, работающих в репозитории |
 | `mise.toml` | Закрепление openspec CLI (2.1.1) для выбравших OpenSpec — перекрывает каскад workspace |
 | `docs/` | Документ кейсов — применение системы за пределами основного пути README |
-| `plugins/tessera-plugin/` | Плагин-носитель: навыки и правила |
+| `plugins/tessera-plugin/` | Плагин-носитель: навыки, правила и шаблоны операций |
 | `plugins/tessera-plugin/.zcode-plugin/plugin.json` | Манифест плагина для ZCode |
 | `plugins/tessera-plugin/.claude-plugin/plugin.json` | Зеркальный манифест для Claude Code |
 | `plugins/tessera-plugin/skills/` | Навыки формата Agent Skills |
 | `plugins/tessera-plugin/rules/` | Правила оформления и процесса |
+| `plugins/tessera-plugin/templates/` | Шаблоны операций workflow-fast и workflow, из которых `backlog generate` порождает беклоги |
 | `.claude-plugin/marketplace.json` | Каталог маркетплейса `tessera` (владелец `usp`) в корне репозитория |
+| `scripts/install.sh` | Скрипт поставки: устанавливает навыки, правила, шаблоны и зависимости в любой харнес |
 | `scripts/bootstrap.sh` | Локальная регистрация навыков плагина в харнесах |
-| `scripts/install-plugins.sh` | Профили установки плагина и опциональных зависимостей из маркетплейсов-источников |
-| `templates/` | Шаблоны операций workflow-fast и workflow для порождения беклогов |
 | `backlog/` | Следы прогонов операций — порождённые беклоги с отметками исполнения |
 | `openspec/` | Спецификации OpenSpec — процесс разработки самого репозитория; в поставку не входит |
 | `.zcode/`, `.claude/`, `.agents/` | Локальная регистрация харнесов; вне индекса git |
@@ -41,7 +41,9 @@
 
 Регистрация харнесов локальна и в индекс git не входит: `scripts/bootstrap.sh` создаёт симлинки
 навыков в каталогах харнесов — известные цели харнесов или произвольный путь (перечень печатает
-`--help`); OpenSpec устанавливается командой `openspec init` с набором инструментов по выбору
+`--help`). ZCode читает навыки из `.agents/skills/` и отдельной цели не имеет: прежние ссылки
+навыков плагина из `.zcode/skills/` скрипт снимает. OpenSpec устанавливается командой
+`openspec init` с набором инструментов по выбору
 разработчика. Подробности — в [`AGENTS.md`](./AGENTS.md#локальная-настройка).
 
 ## Блок бейджей
@@ -76,9 +78,16 @@
 ```bash
 python3 -m json.tool plugins/tessera-plugin/.zcode-plugin/plugin.json > /dev/null   # манифест ZCode — валидный JSON
 diff plugins/tessera-plugin/.zcode-plugin/plugin.json plugins/tessera-plugin/.claude-plugin/plugin.json  # манифесты идентичны
-bash scripts/bootstrap.sh                                                            # локальная регистрация навыков
-scripts/install-plugins.sh --help                                                     # справка профилей установки зависимостей
+bash -n scripts/install.sh                                                            # синтаксис скрипта поставки
+scripts/install.sh --help                                                             # справка скрипта поставки
+FAKE=$(mktemp -d) && HOME="$FAKE" scripts/install.sh --yes --skills-dir "$FAKE/skills"  # дымовой прогон в поддельном домашнем каталоге
+bash scripts/bootstrap.sh                                                              # локальная регистрация навыков
 ```
+
+Дымовой прогон ставит полный профиль в поддельный домашний каталог: харнесов в нём нет,
+поэтому каталог навыков передаётся явно. Прогон пройден, когда команда отвечает кодом `0`
+и отчёт называет неисправных ссылок `0`; каталог прогона удаляется командой
+`rm -rf "$FAKE"`.
 
 ## Правила и процесс
 
@@ -105,3 +114,4 @@ scripts/install-plugins.sh --help                                               
 | 1.0.9 | 2026-11-23 | Ошибка владельца: Marketplace manifest not found при добавлении git-URL | ZCode | GLM-5.3 | Каталог маркетплейса перенесён в корень репозитория (`.claude-plugin/marketplace.json`); строка устройства обновлена |
 | 1.1.0 | 2026-11-23 | TSS-012, OpenSpec change `optional-plugin-supply`, задача 4.3 | ZCode | GLM-5.3 | Устройство дополнено `scripts/install-plugins.sh` — профилями установки плагина и опциональных зависимостей из маркетплейсов-источников |
 | 1.1.1 | 2026-11-23 | TSS-012, аудит project-docs после применения `optional-plugin-supply` | ZCode | GLM-5.3 | Аудит выровнял документы: из устройства убрано устаревшее упоминание Python-инструментов, добавлены строки `docs/`, `templates/`, `backlog/` и проверка `scripts/install-plugins.sh --help`; локальная настройка больше не повторяет перечень целей `bootstrap.sh` — DGN-011 |
+| 1.2.0 | 2026-11-24 | OpenSpec change `single-install-script`, задача 4.4 | ZCode | GLM-5.4 | Устройство переведено на скрипт поставки: `scripts/install.sh` и `plugins/tessera-plugin/templates/` вместо корневого `templates/` и `scripts/install-plugins.sh`. В локальной настройке отмечено, что ZCode читает навыки из `.agents/skills/` и прежние ссылки из `.zcode/skills/` снимаются. Проверки дополнены синтаксисом и справкой скрипта поставки и дымовым прогоном полного профиля в поддельном домашнем каталоге; проверка `scripts/install-plugins.sh --help` снята |

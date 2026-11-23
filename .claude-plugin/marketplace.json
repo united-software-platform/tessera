@@ -7,7 +7,7 @@
     {
       "name": "tessera-plugin",
       "source": "./plugins/tessera-plugin",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "description": "Навыки и правила tessera: документы проекта, workflow-операции, правила оформления, окружения и git-процесса — единый источник для харнесов с поддержкой плагинов",
       "displayName": "Tessera Plugin"
     }
