@@ -22,10 +22,10 @@
 **Когда.** Я работаю в ZCode и хочу получать обновления tessera кнопкой, не обновляя клон
 вручную.
 
-**Что делаю.** Открываю **Plugin Marketplace → Add → Add Plugin Marketplace** и вставляю путь
-к каталогу `plugins/` моего клона tessera. Затем в **Personal → tessera** устанавливаю
-**Tessera Plugin** и зависимости: **Backlog (formular)** — для workflow-навыков,
-**Matt Pocock Skills** — для прожарки в `workflow-grill`.
+**Что делаю.** Открываю **Plugin Marketplace → Add → Add Plugin Marketplace** и вставляю
+адрес репозитория: `https://github.com/united-software-platform/tessera.git`. Затем
+в **Personal → tessera** устанавливаю **Tessera Plugin** и зависимости: **Backlog (formular)** —
+для workflow-навыков, **Matt Pocock Skills** — для прожарки в `workflow-grill`.
 
 **Что получаю.** Навыки и правила tessera как установленный плагин; обновление — refresh
 маркетплейса и кнопка Update в разделе плагина.
@@ -37,7 +37,7 @@
 **Что делаю.** В REPL выполняю:
 
 ```text
-/plugin marketplace add <путь-к-клону-tessera>/plugins
+/plugin marketplace add united-software-platform/tessera
 /plugin install tessera-plugin@tessera
 /plugin install backlog@tessera
 /plugin install mattpocock-skills@tessera
@@ -119,3 +119,4 @@ refresh маркетплейса и Update в деталях плагина.
 | 1.1.0 | 2026-11-23 | Запрос пользователя: описать в README поставку, примеры — в кейсах | ZCode | GLM-5.3 | Добавлены кейсы применения навыков с примерами вызовов: кейс 4 — аудит и правка документов (project-docs), кейс 5 — быстрый workflow (workflow-fast), кейс 6 — workflow с прожаркой (workflow-grill); назначение документа расширено до применения навыков |
 | 1.2.0 | 2026-11-23 | Запрос пользователя: добавить зависимость mattpocock-skills | ZCode | GLM-5.3 | Кейсы 1 и 2 дополнены установкой Matt Pocock Skills; кейс 6 — условием установки mattpocock-skills (прожарка делегируется навыку `grilling`) |
 | 1.2.1 | 2026-11-23 | Решение владельца: канон — «маркетплейс», имя — tessera | ZCode | GLM-5.3 | «Рынок» заменён каноном «маркетплейс»; имя маркетплейса в кейсах 1–2 и командах установки — `tessera` (владелец `usp`) |
+| 1.2.2 | 2026-11-23 | Ошибка владельца: Marketplace manifest not found при добавлении git-URL | ZCode | GLM-5.3 | Каталог маркетплейса перенесён в корень репозитория (`.claude-plugin/marketplace.json`), источник записи — `./plugins/tessera-plugin`; кейсы 1–2 переведены на добавление git-URL репозитория |
