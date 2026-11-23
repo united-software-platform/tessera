@@ -4,6 +4,11 @@
 [![версия backlog](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Funited-software-platform%2Fformular%2Fmain%2Fplugin%2Fbacklog%2F.claude-plugin%2Fplugin.json&query=%24.version&label=backlog&color=9cf)](https://github.com/united-software-platform/formular/tree/main/plugin/backlog)
 [![версия mattpocock-skills](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmattpocock%2Fskills%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=mattpocock-skills&color=9cf)](https://github.com/mattpocock/skills)
 [![лицензия MIT](https://img.shields.io/badge/license-MIT-success)](https://spdx.org/licenses/MIT.html)
+![ZCode](https://img.shields.io/badge/ZCode-blueviolet)
+[![Codex](https://img.shields.io/badge/Codex-blueviolet)](https://github.com/openai/codex)
+[![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-blueviolet)](https://github.com/google-gemini/gemini-cli)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-blueviolet)](https://claude.com/claude-code)
+[![OpenCode](https://img.shields.io/badge/OpenCode-blueviolet)](https://opencode.ai)
 
 tessera — минимальный инженерный фреймворк: правила работы с репозиториями, процессами
 и построения ПО вместе с навыками, которые их применяют. Гибкий пересмотр
@@ -11,8 +16,14 @@ tessera — минимальный инженерный фреймворк: пр
 методология без его привязки к Claude и песочнице. Имя — мозаичный элемент: набор, собранный
 из частей.
 
-Поставка — скрипт установки: одна команда ставит навыки, правила и шаблоны операций
-в любой харнес, читающий навыки из каталога.
+Поставка — скрипт установки: одна команда ставит в любой харнес, читающий навыки
+из каталога, навыки и правила, а профилями с зависимостями — ещё и плагины-зависимости.
+Состав поставки открыт — ниже всё, что оказывается на машине после установки.
+Инструментов в поставке нет: ни хуков, ни команд, ни MCP-серверов; из инструментов
+ставится только команда `backlog` — лаунчер CLI зависимости, профилем с backlog
+([Шаг 1](#шаг-1-установить-tessera)).
+
+Навыки и правила — несёт плагин tessera-plugin:
 
 - навык `project-docs` — аудит и правка `README.md`, `CONTRIBUTING.md` и документа кейсов
   по норме DGN;
@@ -23,6 +34,17 @@ tessera — минимальный инженерный фреймворк: пр
   документы проекта, git-процесс; после установки применяются навыками: точка входа —
   `tessera-plugin`, профильные навыки ссылаются на свои правила сами;
 - шаблоны операций — `workflow-fast` и `workflow`: из них навыки workflow порождают беклоги.
+
+Плагины-зависимости — приносят профили `backlog` и полный, клонируя репозитории-источники:
+
+- [backlog](https://github.com/united-software-platform/formular/tree/main/plugin/backlog)
+  из formular — навыки `backlog-generate`, `backlog-run` и `backlog-template`: порождение
+  и исполнение беклогов операций;
+- [mattpocock-skills](https://github.com/mattpocock/skills) — навыки инжиниринга из каталогов
+  `engineering` и `productivity`: код-ревью, TDD, доменное моделирование и другие.
+
+Ничего сверх перечня не ставится: отчёт установки называет каждую созданную ссылку,
+а профиль «только tessera» обходится одними навыками и правилами.
 
 Разработка самого tessera ведётся через OpenSpec (каталог `openspec/`); в поставку он
 не входит.
