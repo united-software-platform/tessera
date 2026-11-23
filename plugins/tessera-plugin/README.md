@@ -1,16 +1,18 @@
 # tessera-plugin
 
-Базовый каркас-шаблон плагина для проекта tessera: навык-заготовка и Python-инструменты,
-которые наполняются реальным поведением. Отправная точка для собственных расширений агента.
+Носитель навыков и правил проекта tessera: навыки формата Agent Skills, правила оформления
+и процесса, Python-инструменты. Один источник для харнесов с поддержкой плагинов — ZCode
+и Claude Code — без специализированных каталогов `.claude` и `.zcode`.
 
 ---
 
 ## Навигация
 
 - [Структура](#структура)
+- [Зависимости](#зависимости)
 - [Python-инструменты](#python-инструменты)
+- [Совместимость с харнесами](#совместимость-с-харнесами)
 - [Как расширять](#как-расширять)
-- [Совместимость с Claude Code](#совместимость-с-claude-code)
 - [Проверка](#проверка)
 
 ---
@@ -19,10 +21,48 @@
 
 | Путь | Назначение |
 |------|------------|
-| `.zcode-plugin/plugin.json` | Манифест плагина для ZCode: имя, версия, объявленные компоненты |
+| `.zcode-plugin/plugin.json` | Манифест плагина для ZCode |
 | `.claude-plugin/plugin.json` | Зеркальный манифест для Claude Code; синхронизируется с ним |
-| `skills/tessera-plugin/SKILL.md` | Навык-заготовка: порядок работы при обращении к плагину |
+| `skills/` | Навыки формата Agent Skills — по каталогу на навык |
+| `rules/` | Правила оформления и процесса: документация, чтение, окружение, архитектура, CQRS, DDD, документы проекта, git |
 | `scripts/tessera_tools.py` | Python-инструменты каркаса: подкоманды, вызываемые из навыка |
+
+Навыки:
+
+| Навык | Назначение |
+|-------|------------|
+| `tessera-plugin` | Каркас-заготовка: демонстрация Python-инструментов |
+| `project-docs` | Аудит и правка `README.md`, `CONTRIBUTING.md` и документа кейсов по DGN-норме |
+| `workflow-fast` | Быстрый рабочий процесс от требования до ветки изменений без прожарки |
+| `workflow-grill` | Рабочий процесс от требования до прожарки |
+
+Навыки `workflow-fast` и `workflow-grill` зависят от плагина backlog — см. [Зависимости](#зависимости).
+
+## Зависимости
+
+| Зависимость | Минимальная версия | Источник |
+|-------------|--------------------|----------|
+| `backlog` | 1.4.0 | `https://github.com/united-software-platform/formular.git`, путь `plugin/backlog`, ветка `main` |
+
+Нативной авто-установки зависимостей в формате плагинов нет — зависимость закрывается тремя
+механизмами:
+
+1. **Запись в том же рынке**: каталог `dev-tessera-edf3c6d1` содержит запись `backlog`
+   с git-источником formular — оба плагина ставятся с одной страницы рынка, версия зависимости
+   подтягивается актуальной с ветки при обновлении рынка.
+2. **Проверка при запуске**: навыки `workflow-fast` и `workflow-grill` первым шагом проверяют
+   доступность `/backlog:backlog-generate`; при её отсутствии — отказ с инструкцией установки.
+3. **Машинно-читаемое объявление**: `python3 scripts/tessera_tools.py deps` печатает список
+   зависимостей с источниками и минимальными версиями.
+
+Установка зависимости в ZCode: **Personal → dev-tessera-edf3c6d1 → Backlog (formular) → Install**.
+
+Установка зависимости в Claude Code (рынок formular — каталог формата Claude):
+
+```text
+/plugin marketplace add united-software-platform/formular
+/plugin install backlog@formular
+```
 
 ## Python-инструменты
 
@@ -31,6 +71,7 @@
 ```bash
 python3 scripts/tessera_tools.py hello --name "мир"
 python3 scripts/tessera_tools.py info
+python3 scripts/tessera_tools.py deps
 ```
 
 Коды возврата:
@@ -40,30 +81,38 @@ python3 scripts/tessera_tools.py info
 | `0` | Подкоманда выполнена | Использую вывод |
 | `2` | Ошибка разбора аргументов | Проверяю состав аргументов команды |
 
-## Как расширять
+## Совместимость с харнесами
 
-1. Реальную возможность оформляйте новой подкомандой в `scripts/tessera_tools.py`: функция `cmd_<имя>`, регистрация в `build_parser`.
-2. Порядок вызова подкоманд из навыка описывайте в `skills/tessera-plugin/SKILL.md`.
-3. При изменении поведения повышайте `version` в `.zcode-plugin/plugin.json` **и** в `.claude-plugin/plugin.json` по семантическому версионированию.
+Единый источник без привязки к конкретному харнесу:
 
-## Совместимость с Claude Code
+- **Навыки и правила** лежат в плагине: харнесы с поддержкой плагинов получают их установкой
+  плагина, остальные — чтением файлов из репозитория.
+- **Манифесты**: ZCode читает `.zcode-plugin/plugin.json`, Claude Code — `.claude-plugin/plugin.json`;
+  содержимое идентично и правится совместно.
+- **Каталог рынка** — `plugins/.claude-plugin/marketplace.json`: расположение Claude Code,
+  поддерживаемое и ZCode; имя рынка `dev-tessera-edf3c6d1` общее.
+- **Правила для работы в репозитории** индексирует корневой `AGENTS.md` — стандарт, читаемый
+  харнесами без поддержки плагинов (Codex, opencode и другими).
 
-Плагин собирается из общих для обоих хостов компонентов: навык `skills/tessera-plugin/SKILL.md`,
-Python-инструменты `scripts/tessera_tools.py` и токен `${CLAUDE_PLUGIN_ROOT}` — их формат совпадает.
-
-Различаются две точки, и обе закрыты зеркальными файлами:
-
-- манифест: ZCode читает `.zcode-plugin/plugin.json`, Claude Code — `.claude-plugin/plugin.json`;
-  содержимое идентично и правится совместно;
-- каталог рынка: `plugins/.claude-plugin/marketplace.json` — расположение, которое требует
-  Claude Code и которое ZCode тоже поддерживает; имя рынка `dev-tessera-edf3c6d1` общее.
+Установка в ZCode: **Plugin Marketplace → Add → Add Plugin Marketplace**, корень — каталог
+`plugins/` репозитория, затем **Personal → dev-tessera-edf3c6d1 → Tessera Plugin → Install**.
 
 Установка в Claude Code (в REPL):
 
 ```text
-/plugin marketplace add /home/llm-station/Workspace/open-source/usp/toolkit/workspace/projects/software-engineering/ai-agent-engineering/tessera/plugins
+/plugin marketplace add <путь-к-клону-репозитория>/plugins
 /plugin install tessera-plugin@dev-tessera-edf3c6d1
 ```
+
+## Как расширять
+
+1. Новый навык — каталог `skills/<имя>/SKILL.md` с frontmatter `name` и `description`;
+   подхватывается обоими манифестами автоматически.
+2. Новая возможность Python-инструментов — подкоманда в `scripts/tessera_tools.py`
+   (функция `cmd_<имя>`, регистрация в `build_parser`).
+3. Новое правило — файл в `rules/` и строка в перечне корневого `AGENTS.md`.
+4. При изменении поведения повышайте `version` в `.zcode-plugin/plugin.json` **и**
+   `.claude-plugin/plugin.json` по семантическому версионированию.
 
 ## Проверка
 

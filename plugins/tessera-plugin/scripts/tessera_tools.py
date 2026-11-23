@@ -14,6 +14,18 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = PLUGIN_ROOT / ".zcode-plugin" / "plugin.json"
 
+# Объявленные зависимости плагина: имя, рынок, git-источник, минимальная версия
+DEPENDENCIES = [
+    {
+        "name": "backlog",
+        "marketplace": "formular",
+        "url": "https://github.com/united-software-platform/formular.git",
+        "path": "plugin/backlog",
+        "ref": "main",
+        "min_version": "1.4.0",
+    },
+]
+
 
 def read_manifest() -> dict:
     """Читает манифест плагина .zcode-plugin/plugin.json."""
@@ -34,6 +46,14 @@ def cmd_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_deps(args: argparse.Namespace) -> int:
+    """Печатает объявленные зависимости плагина и их источники."""
+    for dep in DEPENDENCIES:
+        print(f"Зависимость: {dep['name']} >= {dep['min_version']} (рынок {dep['marketplace']})")
+        print(f"Источник: {dep['url']}, путь {dep['path']}, ветка {dep['ref']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Собирает парсер подкоманд; новые возможности регистрируются здесь."""
     parser = argparse.ArgumentParser(
@@ -48,6 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     info = subparsers.add_parser("info", help="имя и версия плагина из манифеста")
     info.set_defaults(handler=cmd_info)
+
+    deps = subparsers.add_parser("deps", help="зависимости плагина и их источники")
+    deps.set_defaults(handler=cmd_deps)
 
     return parser
 
