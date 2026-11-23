@@ -22,7 +22,7 @@
 | Путь | Назначение |
 |------|------------|
 | `AGENTS.md` | Точка входа правил для агентов, работающих в репозитории |
-| `mise.toml` | Закрепление openspec CLI (2.1.1) — перекрывает каскад workspace |
+| `mise.toml` | Закрепление openspec CLI (2.1.1) для выбравших OpenSpec — перекрывает каскад workspace |
 | `plugins/tessera-plugin/` | Плагин-носитель: навыки, правила, Python-инструменты |
 | `plugins/tessera-plugin/.zcode-plugin/plugin.json` | Манифест плагина для ZCode |
 | `plugins/tessera-plugin/.claude-plugin/plugin.json` | Зеркальный манифест для Claude Code |
@@ -30,7 +30,7 @@
 | `plugins/tessera-plugin/rules/` | Правила оформления и процесса |
 | `plugins/.claude-plugin/marketplace.json` | Каталог маркетплейса `tessera` (владелец `usp`) |
 | `scripts/bootstrap.sh` | Локальная регистрация навыков плагина в харнесах |
-| `openspec/` | Спецификации OpenSpec — схема spec-driven |
+| `openspec/` | Спецификации OpenSpec — процесс разработки самого репозитория; в поставку не входит |
 | `.zcode/`, `.claude/`, `.agents/` | Локальная регистрация харнесов; вне индекса git |
 
 ## Локальная настройка
@@ -49,22 +49,20 @@
 |-------|------|--------------|
 | Поставка | `blue` (#007ec6) | Идентичность главного артефакта — версия tessera-plugin |
 | Зависимость | `9cf` (светлый синий) | Чужой плагин, требуемый навыками; тише собственного |
-| Стандарт / процесс | `blueviolet` | Схема работы — openspec |
 | Право | `success` (зелёный) | Пермиссивная лицензия |
 
 Классовые цвета не пересекаются с семантикой состояний (`green`/`yellow`/`red` зарезервированы
 под «ок / внимание / проблема» — например, для будущего endpoint-бейджа состояния зависимостей).
 Новый бейдж получает класс и цвет до вставки в блок; новый класс заводится вместе со строкой
 легенды. Проверено: shields-алиас `informational` совпадает с `blue` — для класса «зависимость»
-используется `9cf`.
+используется `9cf`. Бейджи openspec убраны: OpenSpec — процесс разработки самого репозитория,
+не часть поставки.
 
 | Бейдж | Класс | Источник значения | Режим | Цель ссылки |
 |-------|-------|-------------------|-------|-------------|
 | Версия tessera-plugin | Поставка | Манифест `plugins/tessera-plugin/.zcode-plugin/plugin.json` (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | blob-страница манифеста |
 | Версия backlog | Зависимость | Манифест `plugin/backlog/.claude-plugin/plugin.json` репозитория formular (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | каталог `plugin/backlog` в formular |
 | Версия mattpocock-skills | Зависимость | Манифест `.claude-plugin/plugin.json` репозитория mattpocock/skills (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | репозиторий mattpocock/skills |
-| OpenSpec-схема | Стандарт / процесс | `openspec/config.yaml`, поле `schema` (raw-файл на `main`) | Динамический — shields `dynamic/yaml`, запрос `schema` | каталог `openspec` этого репозитория |
-| Версия openspec CLI | Стандарт / процесс | npm-реестр пакета `@fission-ai/openspec` | npm-бейдж shields — актуальная версия upstream; закрепление репозитория живёт в `mise.toml` | страница релизов Fission-AI/OpenSpec |
 | Лицензия MIT | Право | Неизменная характеристика | Статический | `https://spdx.org/licenses/MIT.html` |
 
 Переименование манифеста или смена пути сломает динамический бейдж — носители значений
@@ -99,3 +97,4 @@ bash scripts/bootstrap.sh                                                       
 | 1.0.5 | 2026-11-23 | Запрос пользователя: бейджи openspec и mattpocock-skills | ZCode | GLM-5.3 | Добавлен бейдж openspec-схемы (`dynamic/yaml`, поле `schema` из `openspec/config.yaml`) и строка в карту бейджей; бейдж mattpocock-skills добавлен предыдущей правкой (1.0.4) |
 | 1.0.6 | 2026-11-23 | Запрос пользователя: классификация бейджей и цвет по классу | ZCode | GLM-5.3 | Введена легенда классов (поставка `blue`, зависимость `9cf` — `informational` совпадает с `blue`, стандарт `blueviolet`, право `success`) и колонка «Класс» в карту бейджей; цвета применены в README |
 | 1.0.7 | 2026-11-23 | Запрос пользователя: закрепить конкретную версию openspec в tessera | ZCode | GLM-5.3 | Устройство дополнено `mise.toml` (закрепление openspec CLI 2.1.1, перекрывает каскад workspace); в карту бейджей добавлен npm-бейдж версии openspec CLI с оговоркой: бейдж показывает upstream, закрепление живёт в `mise.toml` |
+| 1.0.8 | 2026-11-23 | Прожарка сути (grill-with-docs): фреймворк; openspec — выбор разработчика | ZCode | GLM-5.3 | Бейджи openspec (схема и CLI) убраны из README, их строки и класс «стандарт» — из карты бейджей; строки `mise.toml` и `openspec/` в устройстве переформулированы как выбор разработчика, не часть поставки |

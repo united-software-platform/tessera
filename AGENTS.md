@@ -51,9 +51,9 @@ scripts/bootstrap.sh
 печатает `scripts/bootstrap.sh --help`. Единый источник, без копий; повторный запуск
 идемпотентен.
 
-1. OpenSpec устанавливается по выбору разработчика: набор харнесов не навязывается. CLI
-закреплён в `mise.toml` репозитория — `npm:@fission-ai/openspec` 2.1.1, перекрывает каскад
-workspace:
+1. Разработка репозитория ведётся через OpenSpec; при инициализации набор харнесов
+не навязывается. CLI закреплён в `mise.toml` репозитория — `npm:@fission-ai/openspec` 2.1.1,
+перекрывает каскад workspace:
 
 ```bash
 mise exec -- openspec init --tools <список-харнесов> --language ru --scope project
