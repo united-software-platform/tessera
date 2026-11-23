@@ -50,7 +50,7 @@
 /plugin install mattpocock-skills@mattpocock
 ```
 
-**Что получаю.** Навыки tessera и backlog как установленные плагины Claude Code; обновление —
+**Что получаю.** Навыки tessera и установленные зависимости как плагины Claude Code; обновление —
 refresh маркетплейса и Update в деталях плагина.
 
 ## Кейс 3. Хочу поставить tessera полным набором
@@ -157,3 +157,4 @@ scripts/install-plugins.sh --all
 | 1.2.2 | 2026-11-23 | Ошибка владельца: Marketplace manifest not found при добавлении git-URL | ZCode | GLM-5.3 | Каталог маркетплейса перенесён в корень репозитория (`.claude-plugin/marketplace.json`), источник записи — `./plugins/tessera-plugin`; кейсы 1–2 переведены на добавление git-URL репозитория |
 | 1.3.0 | 2026-11-23 | TSS-012, OpenSpec change `optional-plugin-supply`, задача 3.3 | ZCode | GLM-5.3 | Кейсы 1–2 переведены на опциональную поставку зависимостей: установка backlog и mattpocock-skills — из маркетплейсов-источников formular и mattpocock напрямую, не из каталога tessera |
 | 1.4.0 | 2026-11-23 | TSS-012, OpenSpec change `optional-plugin-supply`, задача 4.2 | ZCode | GLM-5.3 | Добавлен кейс 3 «Хочу поставить tessera полным набором»: блок команд всех трёх маркетплейсов и скрипт профилей установки `scripts/install-plugins.sh`; последующие кейсы перенумерованы (3→4, 4→5, 5→6, 6→7), ссылки «Подробнее — кейс N» корневого README поправлены той же правкой |
+| 1.4.1 | 2026-11-23 | TSS-012, аудит project-docs после применения `optional-plugin-supply` | ZCode | GLM-5.3 | Кейс 2 «Что получаю» переформулирован: «навыки tessera и установленные зависимости» вместо упоминания только backlog |

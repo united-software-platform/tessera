@@ -23,7 +23,8 @@
 |------|------------|
 | `AGENTS.md` | Точка входа правил для агентов, работающих в репозитории |
 | `mise.toml` | Закрепление openspec CLI (2.1.1) для выбравших OpenSpec — перекрывает каскад workspace |
-| `plugins/tessera-plugin/` | Плагин-носитель: навыки, правила, Python-инструменты |
+| `docs/` | Документ кейсов — применение системы за пределами основного пути README |
+| `plugins/tessera-plugin/` | Плагин-носитель: навыки и правила |
 | `plugins/tessera-plugin/.zcode-plugin/plugin.json` | Манифест плагина для ZCode |
 | `plugins/tessera-plugin/.claude-plugin/plugin.json` | Зеркальный манифест для Claude Code |
 | `plugins/tessera-plugin/skills/` | Навыки формата Agent Skills |
@@ -31,16 +32,17 @@
 | `.claude-plugin/marketplace.json` | Каталог маркетплейса `tessera` (владелец `usp`) в корне репозитория |
 | `scripts/bootstrap.sh` | Локальная регистрация навыков плагина в харнесах |
 | `scripts/install-plugins.sh` | Профили установки плагина и опциональных зависимостей из маркетплейсов-источников |
+| `templates/` | Шаблоны операций workflow-fast и workflow для порождения беклогов |
+| `backlog/` | Следы прогонов операций — порождённые беклоги с отметками исполнения |
 | `openspec/` | Спецификации OpenSpec — процесс разработки самого репозитория; в поставку не входит |
 | `.zcode/`, `.claude/`, `.agents/` | Локальная регистрация харнесов; вне индекса git |
 
 ## Локальная настройка
 
 Регистрация харнесов локальна и в индекс git не входит: `scripts/bootstrap.sh` создаёт симлинки
-навыков в каталогах харнесов — известные цели `zcode`, `claude`, `agents` или произвольный путь
-(перечень печатает `--help`); OpenSpec устанавливается командой `openspec init` с набором
-инструментов по выбору разработчика. Подробности — в
-[`AGENTS.md`](./AGENTS.md#локальная-настройка).
+навыков в каталогах харнесов — известные цели харнесов или произвольный путь (перечень печатает
+`--help`); OpenSpec устанавливается командой `openspec init` с набором инструментов по выбору
+разработчика. Подробности — в [`AGENTS.md`](./AGENTS.md#локальная-настройка).
 
 ## Блок бейджей
 
@@ -75,6 +77,7 @@
 python3 -m json.tool plugins/tessera-plugin/.zcode-plugin/plugin.json > /dev/null   # манифест ZCode — валидный JSON
 diff plugins/tessera-plugin/.zcode-plugin/plugin.json plugins/tessera-plugin/.claude-plugin/plugin.json  # манифесты идентичны
 bash scripts/bootstrap.sh                                                            # локальная регистрация навыков
+scripts/install-plugins.sh --help                                                     # справка профилей установки зависимостей
 ```
 
 ## Правила и процесс
@@ -101,3 +104,4 @@ bash scripts/bootstrap.sh                                                       
 | 1.0.8 | 2026-11-23 | Прожарка сути (grill-with-docs): фреймворк; openspec — выбор разработчика | ZCode | GLM-5.3 | Бейджи openspec (схема и CLI) убраны из README, их строки и класс «стандарт» — из карты бейджей; строки `mise.toml` и `openspec/` в устройстве переформулированы как выбор разработчика, не часть поставки |
 | 1.0.9 | 2026-11-23 | Ошибка владельца: Marketplace manifest not found при добавлении git-URL | ZCode | GLM-5.3 | Каталог маркетплейса перенесён в корень репозитория (`.claude-plugin/marketplace.json`); строка устройства обновлена |
 | 1.1.0 | 2026-11-23 | TSS-012, OpenSpec change `optional-plugin-supply`, задача 4.3 | ZCode | GLM-5.3 | Устройство дополнено `scripts/install-plugins.sh` — профилями установки плагина и опциональных зависимостей из маркетплейсов-источников |
+| 1.1.1 | 2026-11-23 | TSS-012, аудит project-docs после применения `optional-plugin-supply` | ZCode | GLM-5.3 | Аудит выровнял документы: из устройства убрано устаревшее упоминание Python-инструментов, добавлены строки `docs/`, `templates/`, `backlog/` и проверка `scripts/install-plugins.sh --help`; локальная настройка больше не повторяет перечень целей `bootstrap.sh` — DGN-011 |
