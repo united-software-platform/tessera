@@ -1,0 +1,5 @@
+# Локальная регистрация харнесов и OpenSpec — создаётся настройкой разработчика
+# (scripts/bootstrap.sh и openspec init с выбранным набором инструментов)
+.zcode/
+.agents/
+.claude/
