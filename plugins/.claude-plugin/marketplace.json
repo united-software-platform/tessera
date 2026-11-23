@@ -1,0 +1,12 @@
+{
+  "name": "dev-tessera-edf3c6d1",
+  "plugins": [
+    {
+      "name": "tessera-plugin",
+      "source": "./tessera-plugin",
+      "version": "0.1.0",
+      "description": "Базовый каркас-шаблон плагина tessera: навык-заготовка и Python-инструменты, наполняемые реальным поведением",
+      "displayName": "Tessera Plugin"
+    }
+  ]
+}

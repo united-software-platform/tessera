@@ -1,0 +1,9 @@
+{
+  "name": "tessera-plugin",
+  "version": "0.1.0",
+  "description": "Базовый каркас-шаблон плагина tessera: навык-заготовка и Python-инструменты, наполняемые реальным поведением",
+  "author": {
+    "name": "Alexey Gaybovich"
+  },
+  "skills": "./skills"
+}
