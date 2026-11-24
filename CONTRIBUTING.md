@@ -55,7 +55,7 @@
 | Поставка | `blue` (#007ec6) | Идентичность главного артефакта — версия tessera-plugin |
 | Зависимость | `9cf` (светлый синий) | Чужой плагин, требуемый навыками; тише собственного |
 | Право | `success` (зелёный) | Пермиссивная лицензия |
-| Харнес | Корпоративный цвет технологии: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black); ZCode публичной палитры не имеет — классовый `blueviolet` (#8a2be2) | Среда, в которой работает поставка |
+| Харнес | Корпоративный цвет технологии: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black), ZCode — чёрный `000000` | Среда, в которой работает поставка |
 
 Классовые цвета не пересекаются с семантикой состояний (`green`/`yellow`/`red` зарезервированы
 под «ок / внимание / проблема» — например, для будущего endpoint-бейджа состояния зависимостей).
@@ -125,3 +125,4 @@ bash scripts/bootstrap.sh                                                       
 | 1.4.0 | 2026-11-24 | TSS-014, OpenSpec change `connect-rules-to-project`, задача 7.5 | ZCode | GLM-5.4 | Строка `scripts/install.sh` в устройстве дополнена подключением правил к проекту (`--project`: копии в `.tessera/rules/`, секция в `AGENTS.md`); проверки дополнены дымовым прогоном установки в проект — секция правил со штампом `delivery-tessera-` в `AGENTS.md` временного проекта |
 | 1.5.0 | 2026-11-24 | TSS-016, OpenSpec change `delivery-registry-json`, задача 4.5 | ZCode | GLM-5.4 | Проверки дополнены реестром поставки: `scripts/install.sh --registry` через `python3 -m json.tool` — валидный JSON |
 | 1.6.0 | 2026-11-24 | Запрос владельца: бейджи харнесов в корпоративных цветах технологий | ZCode | GLM-5.4 | Бейджи харнесов перекрашены из единого классового `blueviolet` в корпоративные цвета технологий: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black); ZCode — классовый `blueviolet`, публичной палитры нет. Легенда и карта бейджей дополнены источниками цветов |
+| 1.6.1 | 2026-11-24 | Решение владельца: ZCode — чёрный | ZCode | GLM-5.4 | Бейдж ZCode перекрашен из классового `blueviolet` в чёрный `000000`; легенда приведена к нему |
