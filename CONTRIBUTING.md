@@ -55,7 +55,7 @@
 | Поставка | `blue` (#007ec6) | Идентичность главного артефакта — версия tessera-plugin |
 | Зависимость | `9cf` (светлый синий) | Чужой плагин, требуемый навыками; тише собственного |
 | Право | `success` (зелёный) | Пермиссивная лицензия |
-| Харнес | `blueviolet` (#8a2be2) | Среда, в которой работает поставка |
+| Харнес | Корпоративный цвет технологии: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black); ZCode публичной палитры не имеет — классовый `blueviolet` (#8a2be2) | Среда, в которой работает поставка |
 
 Классовые цвета не пересекаются с семантикой состояний (`green`/`yellow`/`red` зарезервированы
 под «ок / внимание / проблема» — например, для будущего endpoint-бейджа состояния зависимостей).
@@ -70,7 +70,7 @@
 | Версия backlog | Зависимость | Манифест `plugin/backlog/.claude-plugin/plugin.json` репозитория formular (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | каталог `plugin/backlog` в formular |
 | Версия mattpocock-skills | Зависимость | Манифест `.claude-plugin/plugin.json` репозитория mattpocock/skills (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | репозиторий mattpocock/skills |
 | Лицензия MIT | Право | Неизменная характеристика | Статический | `https://spdx.org/licenses/MIT.html` |
-| Харнесы (5 статических: ZCode, Codex, Gemini CLI, Claude Code, OpenCode) | Харнес | Таблица харнесов `scripts/install.sh` — носитель состава поддержки | Статические | Codex — репозиторий `openai/codex`, Gemini CLI — `google-gemini/gemini-cli`, Claude Code — `claude.com/claude-code`, OpenCode — `opencode.ai`; ZCode — без ссылки, публичной страницы нет |
+| Харнесы (5 статических: ZCode, Codex, Gemini CLI, Claude Code, OpenCode) | Харнес — корпоративный цвет технологии (см. легенду) | Таблица харнесов `scripts/install.sh` — носитель состава поддержки; цвета — бренд-страницы технологий: openai.com/brand, Google Partner Marketing Hub, палитра Anthropic, opencode.ai/brand | Статические | Codex — репозиторий `openai/codex`, Gemini CLI — `google-gemini/gemini-cli`, Claude Code — `claude.com/claude-code`, OpenCode — `opencode.ai`; ZCode — без ссылки, публичной страницы нет |
 
 Переименование манифеста или смена пути сломает динамический бейдж — носители значений
 перечислены в таблице. Значения читаются с ветки `main` GitHub.
@@ -124,3 +124,4 @@ bash scripts/bootstrap.sh                                                       
 | 1.3.0 | 2026-11-24 | TSS-013, запрос владельца: бейджи харнесов и прозрачность поставки в README | ZCode | GLM-5.3-Flash | Блок бейджей дополнен пятью статическими бейджами поддерживаемых харнесов: заведён класс «Харнес» (`blueviolet` — цвет возвращён после удаления класса «стандарт» в 1.0.8), строка легенды и строка карты бейджей с носителем состава поддержки — таблицей харнесов `scripts/install.sh`. В README состав поставки разделён на навыки и правила (несёт плагин tessera-plugin, вместе с шаблонами операций) и плагины-зависимости (backlog из formular и mattpocock-skills — приносят профили с зависимостями, источники названы ссылками); заявлено отсутствие инструментов в поставке и полнота отчёта установки; в README плагина — внутри только навыки, правила и шаблоны, инструментов и плагинов-зависимостей в нём нет |
 | 1.4.0 | 2026-11-24 | TSS-014, OpenSpec change `connect-rules-to-project`, задача 7.5 | ZCode | GLM-5.4 | Строка `scripts/install.sh` в устройстве дополнена подключением правил к проекту (`--project`: копии в `.tessera/rules/`, секция в `AGENTS.md`); проверки дополнены дымовым прогоном установки в проект — секция правил со штампом `delivery-tessera-` в `AGENTS.md` временного проекта |
 | 1.5.0 | 2026-11-24 | TSS-016, OpenSpec change `delivery-registry-json`, задача 4.5 | ZCode | GLM-5.4 | Проверки дополнены реестром поставки: `scripts/install.sh --registry` через `python3 -m json.tool` — валидный JSON |
+| 1.6.0 | 2026-11-24 | Запрос владельца: бейджи харнесов в корпоративных цветах технологий | ZCode | GLM-5.4 | Бейджи харнесов перекрашены из единого классового `blueviolet` в корпоративные цвета технологий: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black); ZCode — классовый `blueviolet`, публичной палитры нет. Легенда и карта бейджей дополнены источниками цветов |

@@ -5,10 +5,10 @@
 [![версия mattpocock-skills](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmattpocock%2Fskills%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=mattpocock-skills&color=9cf)](https://github.com/mattpocock/skills)
 [![лицензия MIT](https://img.shields.io/badge/license-MIT-success)](https://spdx.org/licenses/MIT.html)
 ![ZCode](https://img.shields.io/badge/ZCode-blueviolet)
-[![Codex](https://img.shields.io/badge/Codex-blueviolet)](https://github.com/openai/codex)
-[![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-blueviolet)](https://github.com/google-gemini/gemini-cli)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-blueviolet)](https://claude.com/claude-code)
-[![OpenCode](https://img.shields.io/badge/OpenCode-blueviolet)](https://opencode.ai)
+[![Codex](https://img.shields.io/badge/Codex-10A37F)](https://github.com/openai/codex)
+[![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-4285F4)](https://github.com/google-gemini/gemini-cli)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-D97757)](https://claude.com/claude-code)
+[![OpenCode](https://img.shields.io/badge/OpenCode-201D1D)](https://opencode.ai)
 
 tessera — минимальный инженерный фреймворк: правила работы с репозиториями, процессами
 и построения ПО вместе с навыками, которые их применяют. Гибкий пересмотр
