@@ -53,42 +53,32 @@ tessera — минимальный инженерный фреймворк: пр
 и лаунчер; каждая запись — имя, тип (`symlink`, `copy`, `section`, `wrapper`), целевой путь
 и источник. Реестр отражает параметры запуска — `--profile`, `--project`, `--rules` и другие —
 и ничего не меняет на диске, поэтому состав можно сверить с репозиторием до установки.
-Сокращённый пример реального вывода (`--project --rules documentation-rules,git-rules`):
+Та же поставка деревом:
 
-```json
-{
-  "registry_version": "1.0.0",
-  "generated_at": "2026-11-24T20:55:00",
-  "profile": "full",
-  "mode": "project",
-  "components": [
-    {"name": "tessera", "source": "https://github.com/united-software-platform/tessera.git", "storage": "~/.local/share/tessera/tessera", "included": true, "present": true, "revision": "c1679e3"},
-    …
-  ],
-  "skill_dirs": [
-    {"harness": "zcode", "dir": "./.agents/skills"},
-    {"harness": "claude", "dir": "./.claude/skills"}
-  ],
-  "skills": {
-    "status": "complete",
-    "entries": [
-      {"name": "workflow-fast", "component": "tessera", "type": "symlink", "target": "./.agents/skills/workflow-fast", "source": "~/.local/share/tessera/tessera/plugins/tessera-plugin/skills/workflow-fast"},
-      …
-    ]
-  },
-  "rules": {
-    "status": "complete",
-    "entries": [
-      {"name": "documentation-rules", "type": "copy", "target": ".tessera/rules/documentation-rules.md", "source": "~/.local/share/tessera/tessera/plugins/tessera-plugin/rules/documentation-rules.md"},
-      …
-    ]
-  },
-  "entrypoint": {"path": "AGENTS.md", "type": "section", "marker_prefix": "<!-- delivery-tessera-"},
-  "launcher": {"path": "~/.local/bin/backlog", "type": "wrapper", "included": true}
-}
+```text
+tessera — профиль «full», режим «user»
+├── ~/.local/share/tessera/              хранилище: клоны источников
+│   ├── tessera/                         навыки, правила, шаблоны операций
+│   ├── formular/                        backlog
+│   └── mattpocock-skills/
+├── ~/.local/bin/backlog                 лаунчер CLI зависимости
+├── навыки → каталоги харнесов           34 симлинка
+│   ├── ~/.agents/skills/                (ZCode, Codex, Gemini CLI)
+│   └── ~/.claude/skills/                (Claude Code)
+│       ├── tessera (4)      project-docs · tessera-plugin · workflow-fast · workflow-grill
+│       ├── formular (3)     backlog-generate · backlog-run · backlog-template
+│       └── mattpocock (27)  ask-matt · code-review · codebase-design · diagnosing-bugs
+│                          domain-modeling · grill-me · grill-with-docs · grilling
+│                          handoff · implement · implement-spec · improve-codebase-…
+│                          pr · prototype · research · retro · setup-matt-pocock-…
+│                          tdd · teach · to-questionnaire · to-spec · to-tickets
+│                          triage · wait-what · wayfinder · wizard · writing-for-agents
+└── с --project добавляется в проект:
+    ├── .tessera/rules/                  копии правил: все 8 или выбранные
+    └── AGENTS.md                        секция delivery-tessera-<штамп>
 ```
 
-Полный реестр с выбранными параметрами:
+JSON для разбора программой:
 
 ```bash
 scripts/install.sh --registry | python3 -m json.tool
