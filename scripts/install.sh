@@ -41,6 +41,7 @@ PROFILE_ARG=""
 HARNESS_ARG=""
 SKILLS_DIR=""
 RULES_ARG=""
+REGISTRY=0
 PROJECT_MODE=0
 YES=0
 UNINSTALL=0
@@ -84,6 +85,7 @@ usage() {
                                   файлов правил без .md через запятую
   --harness <список>               ограничить харнесы через запятую          все найденные
   --skills-dir <путь>              дополнительный каталог навыков            —
+  --registry                       печатать реестр поставки в JSON и выйти   —
   --yes                            без диалога                               диалог при терминале
   --uninstall                      удалить созданное скриптом                —
   -h, --help                       справка                                   —
@@ -931,6 +933,240 @@ bin_dir_on_path() {
   return 1
 }
 
+# --- Реестр поставки --------------------------------------------------------
+
+# Экранирует строку для JSON: обратная косая черта, кавычка, табуляция, перевод
+# строки и возврат каретки.
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\t'/\\t}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\n'/\\n}"
+  printf '%s' "$s"
+}
+
+json_str() { printf '"%s"' "$(json_escape "$1")"; }
+
+# Абсолютный путь → относительный для реестра: проект — от корня проекта,
+# машина — от домашнего каталога. Реестр без имён машины переносим.
+registry_path() {
+  case "$1" in
+    "$PROJECT_DIR"/*) printf '.%s' "${1#"$PROJECT_DIR"}" ;;
+    "$HOME_DIR"/*) printf '~%s' "${1#"$HOME_DIR"}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# Профиль реестра: параметр запуска, иначе профиль прежней установки, иначе full.
+registry_profile() {
+  if [ -n "$PROFILE_ARG" ]; then printf '%s' "$PROFILE_ARG"; return; fi
+  local p
+  p="$(installed_profile)"
+  printf '%s' "${p:-full}"
+}
+
+# Раздел компонентов: все компоненты таблицы с признаком вхождения в профиль
+# и состоянием клона (есть и редакция / нет).
+registry_components() {
+  local component out="" first=1 included present rev
+  for component in $(component_names); do
+    included=false
+    present=false
+    rev=null
+    if profile_has "$PROFILE" "$component"; then included=true; fi
+    if [ -d "$STORAGE/$component/.git" ]; then
+      present=true
+      local r
+      r="$(git -C "$STORAGE/$component" log --format=%h -n 1 </dev/null 2>/dev/null)"
+      [ -n "$r" ] && rev="$(json_str "$r")"
+    fi
+    [ "$first" -eq 1 ] || out="$out,"
+    first=0
+    out="$out
+    {\"name\": $(json_str "$component"), \"source\": $(json_str "$(component_url "$component")"), \"storage\": $(json_str "$(registry_path "$STORAGE/$component")"), \"included\": $included, \"present\": $present, \"revision\": $rev}"
+  done
+  printf '%s' "$out"
+}
+
+# Раздел каталогов навыков: харнесы отбора и дополнительный каталог.
+registry_skill_dirs() {
+  local row out="" first=1
+  for row in ${SELECTED[@]+"${SELECTED[@]}"}; do
+    [ "$first" -eq 1 ] || out="$out,"
+    first=0
+    out="$out
+    {\"harness\": $(json_str "$(field "$row" 1)"), \"dir\": $(json_str "$(registry_path "$(harness_target "$row")")")}"
+  done
+  if [ -n "$SKILLS_DIR" ]; then
+    [ "$first" -eq 1 ] || out="$out,"
+    out="$out
+    {\"harness\": \"-\", \"dir\": $(json_str "$(registry_path "$SKILLS_DIR")")}"
+  fi
+  printf '%s' "$out"
+}
+
+# Компоненты профиля, чьих клонов нет в хранилище, — через пробел. Отдельная
+# функция: вызывается в родителе, а не в подстановке команды, чтобы результат
+# не терялся в под-оболочке.
+registry_pending_components() {
+  local component sub pending=""
+  for component in $(profile_components "$PROFILE"); do
+    for sub in $(component_skill_dirs "$component"); do
+      if [ ! -d "$STORAGE/$component/$sub" ]; then
+        list_has "$pending" "$component" || pending="$pending $component"
+      fi
+    done
+  done
+  printf '%s' "${pending# }"
+}
+
+# Записи навыков — по одному на навык и каталог назначения. Клоны, которых нет,
+# записей не дают: их перечисляет registry_pending_components.
+registry_skills_entries() {
+  local t component sub dir path out="" first=1
+  for t in ${TARGETS[@]+"${TARGETS[@]}"}; do
+    for component in $(profile_components "$PROFILE"); do
+      for sub in $(component_skill_dirs "$component"); do
+        dir="$STORAGE/$component/$sub"
+        [ -d "$dir" ] || continue
+        for path in "$dir"/*/; do
+          if [ ! -f "${path}SKILL.md" ]; then continue; fi
+          path="${path%/}"
+          [ "$first" -eq 1 ] || out="$out,"
+          first=0
+          out="$out
+    {\"name\": $(json_str "${path##*/}"), \"component\": $(json_str "$component"), \"type\": \"symlink\", \"target\": $(json_str "$(registry_path "$t")/${path##*/}"), \"source\": $(json_str "$(registry_path "$path")")}"
+        done
+      done
+    done
+  done
+  printf '%s' "$out"
+}
+
+# Перечень имён недоступных компонентов в форме JSON-массива; пусто, когда
+# все клоны на месте.
+registry_pending_json() { # перечень компонентов через пробел
+  local c out="" first=1
+  for c in $1; do
+    [ "$first" -eq 1 ] || out="$out, "
+    first=0
+    out="$out$(json_str "$c")"
+  done
+  printf '%s' "$out"
+}
+
+# Раздел правил: записи выбранных правил и статус. Клона tessera нет — раздел
+# частичный: каркас с пометкой, записи появятся после получения источников.
+registry_rules() {
+  local out="" first=1 name
+  if [ ! -d "$STORAGE/tessera/$(component_rules_dir tessera)" ]; then
+    printf '{
+    "status": "partial",
+    "pending_components": ["tessera"],
+    "entries": []
+  }'
+    return
+  fi
+  collect_rules
+  if [ -z "${RULES_SEL:-}" ]; then
+    # Реестр не спрашивает: умолчания как при --yes, диалог не начинается.
+    local saved="$INTERACTIVE"
+    INTERACTIVE=0
+    resolve_rules
+    INTERACTIVE="$saved"
+  fi
+  local status="complete"
+  [ -n "$RULES_SEL" ] || status="none"
+  for name in $RULES_SEL; do
+    [ "$first" -eq 1 ] || out="$out,"
+    first=0
+    out="$out
+    {\"name\": $(json_str "$name"), \"type\": \"copy\", \"target\": $(json_str ".tessera/rules/$name.md"), \"source\": $(json_str "$(registry_path "$STORAGE/tessera/$(rule_rel "$name")")")}"
+  done
+  printf '{
+    "status": "%s",
+    "entries": [%s]
+  }' "$status" "$out"
+}
+
+# Раздел точки входа: только с параметром проекта; штамп — у реестра-факта.
+registry_entrypoint() { # штамп или пусто
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  local stamp="$1" stamp_json=""
+  [ -n "$stamp" ] && stamp_json=", \"stamp\": $(json_str "$stamp")"
+  printf '{"path": "AGENTS.md", "type": "section", "marker_prefix": %s%s}' \
+    "$(json_str "$SECTION_OPEN")" "$stamp_json"
+}
+
+# Собирает реестр в REGISTRY_TEXT. Аргумент — штамп секции для реестра-факта;
+# пустой аргумент означает префлайт: печать без записи на диск.
+build_registry() { # штамп или пусто
+  local stamp="${1:-}"
+  PROFILE="$(registry_profile)"
+  read -r -a WANTED <<< "$(profile_components "$PROFILE")"
+  local now skills_status="" skills_pending_json="" rules_part="" entrypoint_json=""
+  now="$(date +%Y-%m-%dT%H:%M:%S)"
+  local comp_json dirs_json skills_json pending
+  comp_json="$(registry_components)"
+  dirs_json="$(registry_skill_dirs)"
+  skills_json="$(registry_skills_entries)"
+  pending="$(registry_pending_components)"
+  if [ -n "$pending" ]; then
+    skills_status="partial"
+    skills_pending_json=",
+    \"pending_components\": [$(registry_pending_json "$pending")]"
+  else
+    skills_status="complete"
+  fi
+  if [ "$PROJECT_MODE" -eq 1 ]; then
+    local rules_json entry_json
+    rules_json="$(registry_rules)"
+    entry_json="$(registry_entrypoint "$stamp")"
+    if [ -n "$entry_json" ]; then
+      rules_part="
+  \"rules\": $rules_json,
+  \"entrypoint\": $entry_json,"
+    fi
+  fi
+  local launcher_included=false
+  profile_has "$PROFILE" formular && launcher_included=true
+  REGISTRY_TEXT="{
+  \"registry_version\": \"1.0.0\",
+  \"generated_at\": \"$(json_escape "$now")\",
+  \"profile\": $(json_str "$PROFILE"),
+  \"mode\": \"$([ "$PROJECT_MODE" -eq 1 ] && printf project || printf user)\",
+  \"components\": [$comp_json],
+  \"skill_dirs\": [$dirs_json],
+  \"skills\": {
+    \"status\": \"$skills_status\"$skills_pending_json,
+    \"entries\": [$skills_json]
+  },$rules_part
+  \"launcher\": {\"path\": $(json_str "$(registry_path "$LAUNCHER")"), \"type\": \"wrapper\", \"included\": $launcher_included}
+}"
+}
+
+# Печатает реестр на стандартный вывод — единственный вывод команды.
+emit_registry() {
+  printf '%s\n' "$REGISTRY_TEXT"
+}
+
+# Записывает реестр-факт: в хранилище всегда, в проект — с параметром проекта.
+# Вызывается после самопроверки: реестр фиксирует состоявшуюся установку.
+write_registry_facts() {
+  build_registry "$RULES_STAMP"
+  printf '%s\n' "$REGISTRY_TEXT" > "$STORAGE/registry.json"
+  REGISTRY_REPORT="$(display "$STORAGE/registry.json")"
+  if [ "$PROJECT_MODE" -eq 1 ]; then
+    mkdir -p "$PROJECT_DIR/.tessera"
+    printf '%s\n' "$REGISTRY_TEXT" > "$PROJECT_DIR/.tessera/registry.json"
+    REGISTRY_REPORT="$REGISTRY_REPORT, $(display "$PROJECT_DIR/.tessera/registry.json")"
+  fi
+}
+
+
+
 # --- Отчёт -----------------------------------------------------------------
 
 # Перечень имён навыков с переносом строк.
@@ -1136,6 +1372,8 @@ install_supply() {
   if [ "${#RULE_BROKEN[@]}" -gt 0 ]; then
     die "самопроверка не пройдена: есть неисправные элементы поставки правил"
   fi
+  write_registry_facts
+  say "  Реестр установки: $REGISTRY_REPORT."
   if [ "$LAUNCHER_CHECK" = "1" ]; then
     die "самопроверка не пройдена: backlog --help не отвечает через лаунчер (для CLI backlog нужен python3)"
   fi
@@ -1205,6 +1443,7 @@ rules_uninstall_run() {
         removed=$(( removed + 1 ))
       fi
     done
+    rm -f "$PROJECT_DIR/.tessera/registry.json"
     if [ -d "$RULES_DIR" ]; then rmdir "$RULES_DIR" 2>/dev/null || true; fi
     if [ -d "${RULES_DIR%/*}" ]; then rmdir "${RULES_DIR%/*}" 2>/dev/null || true; fi
   fi
@@ -1299,6 +1538,7 @@ parse_args() {
       --skills-dir=*) SKILLS_DIR="${1#--skills-dir=}"; need_value --skills-dir "$SKILLS_DIR" ;;
       --rules) need_value "$1" "${2:-}"; RULES_ARG="$2"; shift ;;
       --rules=*) RULES_ARG="${1#--rules=}"; need_value --rules "$RULES_ARG" ;;
+      --registry) REGISTRY=1 ;;
       --project) PROJECT_MODE=1 ;;
       --yes) YES=1 ;;
       --uninstall) UNINSTALL=1 ;;
@@ -1322,6 +1562,9 @@ parse_args() {
   fi
   if [ -n "$RULES_ARG" ] && [ "$PROJECT_MODE" -eq 0 ]; then
     usage_error "--rules подключает правила к проекту и требует --project"
+  fi
+  if [ "$REGISTRY" -eq 1 ] && [ "$UNINSTALL" -eq 1 ]; then
+    usage_error "--registry не сочетается с --uninstall"
   fi
   case "$SKILLS_DIR" in
     "" | /*) ;;
@@ -1353,6 +1596,14 @@ SELECTED=()
 TARGETS=()
 if [ "$UNINSTALL" -eq 1 ]; then select_harnesses all; else select_harnesses found; fi
 compute_targets
+if [ "$REGISTRY" -eq 1 ]; then
+  if [ "${#TARGETS[@]}" -eq 0 ]; then
+    warn "харнесы не найдены и каталог навыков не передан — перечень каталогов навыков в реестре пуст; список харнесов печатает --help"
+  fi
+  build_registry ""
+  emit_registry
+  exit 0
+fi
 if [ "$UNINSTALL" -eq 1 ]; then
   # Хранилище снимается целиком, поэтому свои ссылки разыскиваются и в пользовательских
   # каталогах, когда установка шла в проект.

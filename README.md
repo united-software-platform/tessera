@@ -48,40 +48,56 @@ tessera — минимальный инженерный фреймворк: пр
 Ничего сверх перечня не ставится: отчёт установки называет каждую созданную ссылку,
 а профиль «только tessera» обходится одними навыками и правилами.
 
-**Реестр поставки** — всё, что скрипт создаёт, по уровням:
+**Реестр поставки** печатает `scripts/install.sh --registry` — JSON со всеми записями
+поставки: компоненты с источниками и путями хранилища, навыки, правила, секцию `AGENTS.md`
+и лаунчер; каждая запись — имя, тип (`symlink`, `copy`, `section`, `wrapper`), целевой путь
+и источник. Реестр отражает параметры запуска — `--profile`, `--project`, `--rules` и другие —
+и ничего не меняет на диске, поэтому состав можно сверить с репозиторием до установки.
+Та же поставка деревом:
 
-| Уровень | Путь | Что появляется |
-|---------|------|----------------|
-| Машина | `~/.local/share/tessera/` | Клоны источников: `tessera`, `formular`, `mattpocock-skills` — по профилю; в клоне tessera лежат навыки, правила и шаблоны операций |
-| Машина | `~/.local/bin/backlog` | Лаунчер CLI backlog — профили с backlog; чужой файл по пути сохраняется `backlog.bak` |
-| Харнес | `~/.agents/skills/` (ZCode, Codex, Gemini CLI), `~/.claude/skills/` (Claude Code), `~/.config/opencode/skills/` (OpenCode) | Симлинки на навыки — перечень имён ниже; полную таблицу харнесов и каталогов печатает `scripts/install.sh --help` |
-| Проект | `.agents/skills/`, `.claude/skills/` и другие по той же таблице | Те же симлинки — при `--project`; пользовательские каталоги не меняются |
-| Проект | `.tessera/rules/` | Копии подключённых правил — имена ниже; состав выбирают параметром `--rules` или диалогом |
-| Проект | `AGENTS.md` | Секция правил `delivery-tessera-<штамп>` между комментариями-маркерами; остальной текст файла не меняется |
+```text
+tessera — профиль «full», режим «user»
+├── ~/.local/share/tessera/              хранилище: клоны источников
+│   ├── tessera/                         навыки, правила, шаблоны операций
+│   ├── formular/                        backlog
+│   └── mattpocock-skills/
+├── ~/.local/bin/backlog                 лаунчер CLI зависимости
+├── навыки → каталоги харнесов           34 симлинка
+│   ├── ~/.agents/skills/                (ZCode, Codex, Gemini CLI)
+│   └── ~/.claude/skills/                (Claude Code)
+│       ├── tessera (4)      project-docs · tessera-plugin · workflow-fast · workflow-grill
+│       ├── formular (3)     backlog-generate · backlog-run · backlog-template
+│       └── mattpocock (27)  ask-matt · code-review · codebase-design · diagnosing-bugs
+│                          domain-modeling · grill-me · grill-with-docs · grilling
+│                          handoff · implement · implement-spec · improve-codebase-…
+│                          pr · prototype · research · retro · setup-matt-pocock-…
+│                          tdd · teach · to-questionnaire · to-spec · to-tickets
+│                          triage · wait-what · wayfinder · wizard · writing-for-agents
+└── с --project добавляется в проект:
+    ├── .tessera/rules/                  копии правил: все 8 или выбранные
+    └── AGENTS.md                        секция delivery-tessera-<штамп>
+```
 
-Навыки — 34 симлинка в каталогах навыков харнесов:
+JSON для разбора программой:
 
-- tessera (4): `project-docs`, `tessera-plugin`, `workflow-fast`, `workflow-grill`;
-- backlog (3): `backlog-generate`, `backlog-run`, `backlog-template`;
-- mattpocock-skills (27): `ask-matt`, `codebase-design`, `code-review`, `diagnosing-bugs`,
-  `domain-modeling`, `grill-with-docs`, `grilling`, `grill-me`, `handoff`, `implement`,
-  `implement-spec`, `improve-codebase-architecture`, `pr`, `prototype`, `research`, `retro`,
-  `setup-matt-pocock-skills`, `tdd`, `teach`, `to-questionnaire`, `to-spec`, `to-tickets`,
-  `triage`, `wayfinder`, `wait-what`, `wizard`, `writing-for-agents`.
+```bash
+scripts/install.sh --registry | python3 -m json.tool
+```
 
-Правила — 8 копий в `.tessera/rules/` при `--project`: `clean-architecture.md`, `cqrs.md`,
-`ddd.md`, `documentation-rules.md`, `environment.md`, `git-rules.md`, `project-docs-rules.md`,
-`reading-rules.md`.
+До первой установки хранилища нет, и реестр печатается частичным: уровни поставки описаны,
+а перечни навыков и правил помечены как недоступные до получения источников.
 
 Совпадения с уже установленным: чужой одноимённый элемент каталога навыков скрипт не
 перезаписывает и называет в отчёте, чужой лаунчер сохраняет резервной копией, чужие файлы
-`.tessera/rules/` не трогает; свои элементы обновляет. Перечень навыков зависимостей — снимок
-источников на 2026-11-24; фактический состав каждой установки называет её отчёт.
+`.tessera/rules/` не трогает; свои элементы обновляет. Факт каждой установки лежит тем же
+реестром в `registry.json` рядом с хранилищем, а при `--project` — ещё и в `.tessera/`
+проекта.
 
 Разработка самого tessera ведётся через OpenSpec (каталог `openspec/`); в поставку он
 не входит.
-Что делают навыки на практике и примеры вызовов — [кейсы 4–6](./docs/use-cases.md),
-установка только в один проект, подключение части правил и обновление кнопкой — кейсы 1–3
+Что делают навыки на практике и примеры вызовов — [кейсы 5–7](./docs/use-cases.md),
+установка только в один проект, состав поставки до установки, подключение части правил
+и обновление кнопкой — кейсы 1–4
 там же. Здесь — путь
 от одной команды до первого работающего навыка. Правящим репозиторий —
 [`CONTRIBUTING.md`](./CONTRIBUTING.md), агентам, работающим в репозитории, —
@@ -136,8 +152,8 @@ scripts/install.sh
 Обновление — повторный запуск, удаление — запуск с параметром `--uninstall`.
 
 Подробнее — [кейс 1](./docs/use-cases.md#кейс-1-хочу-поставить-tessera-только-в-один-проект),
-[кейс 2](./docs/use-cases.md#кейс-2-хочу-подключить-к-проекту-только-часть-правил)
-и [кейс 3](./docs/use-cases.md#кейс-3-хочу-обновлять-tessera-кнопкой).
+[кейс 2](./docs/use-cases.md#кейс-2-хочу-узнать-состав-поставки-до-установки)
+и [кейс 4](./docs/use-cases.md#кейс-4-хочу-обновлять-tessera-кнопкой).
 
 ---
 
@@ -157,8 +173,8 @@ scripts/install.sh
 
 ## Куда дальше
 
-- Применение навыков с примерами вызовов, установка только в один проект, подключение
-  части правил и обновление кнопкой — в [документе кейсов](./docs/use-cases.md).
+- Применение навыков с примерами вызовов, установка только в один проект, состав поставки
+  до установки, подключение части правил и обновление кнопкой — в [документе кейсов](./docs/use-cases.md).
 - Устройство плагина, правила и зависимости — в [README плагина](./plugins/tessera-plugin/README.md).
 - Параметры скрипта установки и каталоги навыков харнесов печатает `scripts/install.sh --help`.
 - Если вы хотите править репозиторий — в [`CONTRIBUTING.md`](./CONTRIBUTING.md).
