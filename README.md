@@ -48,6 +48,36 @@ tessera — минимальный инженерный фреймворк: пр
 Ничего сверх перечня не ставится: отчёт установки называет каждую созданную ссылку,
 а профиль «только tessera» обходится одними навыками и правилами.
 
+**Реестр поставки** — всё, что скрипт создаёт, по уровням:
+
+| Уровень | Путь | Что появляется |
+|---------|------|----------------|
+| Машина | `~/.local/share/tessera/` | Клоны источников: `tessera`, `formular`, `mattpocock-skills` — по профилю; в клоне tessera лежат навыки, правила и шаблоны операций |
+| Машина | `~/.local/bin/backlog` | Лаунчер CLI backlog — профили с backlog; чужой файл по пути сохраняется `backlog.bak` |
+| Харнес | `~/.agents/skills/` (ZCode, Codex, Gemini CLI), `~/.claude/skills/` (Claude Code), `~/.config/opencode/skills/` (OpenCode) | Симлинки на навыки — перечень имён ниже; полную таблицу харнесов и каталогов печатает `scripts/install.sh --help` |
+| Проект | `.agents/skills/`, `.claude/skills/` и другие по той же таблице | Те же симлинки — при `--project`; пользовательские каталоги не меняются |
+| Проект | `.tessera/rules/` | Копии подключённых правил — имена ниже; состав выбирают параметром `--rules` или диалогом |
+| Проект | `AGENTS.md` | Секция правил `delivery-tessera-<штамп>` между комментариями-маркерами; остальной текст файла не меняется |
+
+Навыки — 34 симлинка в каталогах навыков харнесов:
+
+- tessera (4): `project-docs`, `tessera-plugin`, `workflow-fast`, `workflow-grill`;
+- backlog (3): `backlog-generate`, `backlog-run`, `backlog-template`;
+- mattpocock-skills (27): `ask-matt`, `codebase-design`, `code-review`, `diagnosing-bugs`,
+  `domain-modeling`, `grill-with-docs`, `grilling`, `grill-me`, `handoff`, `implement`,
+  `implement-spec`, `improve-codebase-architecture`, `pr`, `prototype`, `research`, `retro`,
+  `setup-matt-pocock-skills`, `tdd`, `teach`, `to-questionnaire`, `to-spec`, `to-tickets`,
+  `triage`, `wayfinder`, `wait-what`, `wizard`, `writing-for-agents`.
+
+Правила — 8 копий в `.tessera/rules/` при `--project`: `clean-architecture.md`, `cqrs.md`,
+`ddd.md`, `documentation-rules.md`, `environment.md`, `git-rules.md`, `project-docs-rules.md`,
+`reading-rules.md`.
+
+Совпадения с уже установленным: чужой одноимённый элемент каталога навыков скрипт не
+перезаписывает и называет в отчёте, чужой лаунчер сохраняет резервной копией, чужие файлы
+`.tessera/rules/` не трогает; свои элементы обновляет. Перечень навыков зависимостей — снимок
+источников на 2026-11-24; фактический состав каждой установки называет её отчёт.
+
 Разработка самого tessera ведётся через OpenSpec (каталог `openspec/`); в поставку он
 не входит.
 Что делают навыки на практике и примеры вызовов — [кейсы 4–6](./docs/use-cases.md),
