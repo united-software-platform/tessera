@@ -2,7 +2,9 @@
 # Скрипт поставки tessera — единый механизм установки для любого харнеса.
 # Источники раскладываются клонами ветки main в хранилище ~/.local/share/tessera/,
 # навыки связываются симлинками с каталогами навыков найденных харнесов, для backlog
-# ставится лаунчер на PATH. Средства харнесов для установки плагинов не используются.
+# ставится лаунчер на PATH. С параметром --project правила плагина копируются в
+# .tessera/rules/ проекта и подключаются секцией в AGENTS.md. Средства харнесов
+# для установки плагинов не используются.
 # Запускается из клона (scripts/install.sh) или одной командой (curl ... | bash):
 # клон служит только способом получить скрипт, источники всегда берутся из репозиториев.
 
@@ -16,9 +18,9 @@ RAW_URL="https://raw.githubusercontent.com/united-software-platform/tessera/main
 LAUNCHER_MARKER="создан скриптом поставки tessera"
 
 # Компоненты поставки: имя (каталог клона в хранилище) | репозиторий |
-# каталоги навыков внутри клона через пробел.
+# каталог навыков внутри клона | каталог правил внутри клона.
 COMPONENTS=(
-  "tessera|https://github.com/united-software-platform/tessera.git|plugins/tessera-plugin/skills"
+  "tessera|https://github.com/united-software-platform/tessera.git|plugins/tessera-plugin/skills|plugins/tessera-plugin/rules"
   "formular|https://github.com/united-software-platform/formular.git|plugin/backlog/skills"
   "mattpocock-skills|https://github.com/mattpocock/skills.git|skills/engineering skills/productivity"
 )
@@ -38,6 +40,7 @@ HARNESSES=(
 PROFILE_ARG=""
 HARNESS_ARG=""
 SKILLS_DIR=""
+RULES_ARG=""
 PROJECT_MODE=0
 YES=0
 UNINSTALL=0
@@ -75,6 +78,10 @@ usage() {
                                   backlog — tessera и backlog
                                   tessera — только tessera
   --project                        регистрация в текущем проекте             пользовательские каталоги
+  --rules all|none|<список>        какие правила подключить к проекту        все (в проекте
+                                  с --project: копии в .tessera/rules/      с копиями — прежний
+                                  и секция в AGENTS.md; имена — имена       перечень)
+                                  файлов правил без .md через запятую
   --harness <список>               ограничить харнесы через запятую          все найденные
   --skills-dir <путь>              дополнительный каталог навыков            —
   --yes                            без диалога                               диалог при терминале
@@ -82,7 +89,10 @@ usage() {
   -h, --help                       справка                                   —
 
 Повторный запуск обновляет клоны и пересоздаёт ссылки; профиль прежней установки
-сохраняется, пока параметр --profile не задал иной.
+сохраняется, пока параметр --profile не задал иной. Секция правил AGENTS.md
+переписывается, когда её текст изменился; отключённый (--rules none) перечень
+не запоминается — без --rules следующий запуск снова предложит прежний перечень
+копий, а без копий — все правила.
 
 Харнесы (признак | пользовательский каталог | проектный каталог):
   zcode      ~/.zcode                     ~/.agents/skills           .agents/skills
@@ -169,6 +179,8 @@ component_row() { # имя компонента → строка таблицы
 component_url() { printf '%s' "$(field "$(component_row "$1")" 2)"; }
 
 component_skill_dirs() { printf '%s' "$(field "$(component_row "$1")" 3)"; }
+
+component_rules_dir() { printf '%s' "$(field "$(component_row "$1")" 4)"; }
 
 component_names() {
   local row
@@ -496,6 +508,386 @@ link_skills() {
   done
 }
 
+# --- Правила проекта --------------------------------------------------------
+
+# Путь правила внутри клона tessera по имени файла без расширения.
+rule_rel() { printf '%s' "$(component_rules_dir tessera)/$1.md"; }
+
+# Совпадает ли файл с какой-либо редакцией правила в истории клона tessera:
+# совпадает — копия поставлена скриптом (актуальная или устаревшая), нет —
+# изменена вручную. Сравнение идёт с текущим состоянием, затем с редакциями git.
+copy_is_ours() { # файл копии, путь правила в клоне
+  local copy="$1" rel="$2" rev dir="$STORAGE/tessera"
+  if cmp -s "$copy" "$dir/$rel"; then return 0; fi
+  while IFS= read -r rev; do
+    [ -n "$rev" ] || continue
+    if git -C "$dir" show "$rev:$rel" 2>/dev/null | cmp -s - "$copy"; then return 0; fi
+  done < <(git -C "$dir" log --format=%H -- "$rel" </dev/null 2>/dev/null)
+  return 1
+}
+
+rule_src_by_name() { # имя правила → файл в клоне
+  local i
+  for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+    if [ "${RULE_NAME[$i]}" = "$1" ]; then printf '%s' "${RULE_SRC[$i]}"; return 0; fi
+  done
+  return 1
+}
+
+rule_stamp() { date +%Y%m%d%H%M%S; }
+
+stamp_human() {
+  printf '%s-%s-%s в %s:%s:%s' "${1:0:4}" "${1:4:2}" "${1:6:2}" "${1:8:2}" "${1:10:2}" "${1:12:2}"
+}
+
+# Перечень правил источников — имена файлов без расширения через пробел.
+all_rules_names() {
+  local i out=""
+  for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do out="$out ${RULE_NAME[$i]}"; done
+  printf '%s' "${out# }"
+}
+
+# Перечень через пробел → «a, b, c» для сообщений.
+rules_csv_display() { printf '%s' "$1" | sed -e 's/^ *//' -e 's/  */ /g' | tr ' ' ',' | sed 's/,/, /g'; }
+
+# Инвентарь правил источников: имя, название из заголовка, файл в клоне.
+collect_rules() {
+  RULE_NAME=()
+  RULE_TITLE=()
+  RULE_SRC=()
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  local dir path name first title
+  dir="$STORAGE/tessera/$(component_rules_dir tessera)"
+  if [ ! -d "$dir" ]; then
+    die "в клоне tessera нет каталога правил $(component_rules_dir tessera)"
+  fi
+  for path in "$dir"/*.md; do
+    if [ ! -f "$path" ]; then continue; fi
+    name="$(basename "$path" .md)"
+    first="$(head -n 1 "$path")"
+    case "$first" in
+      "# "*) title="${first#\# }" ;;
+      *) title="$name" ;;
+    esac
+    RULE_NAME+=("$name")
+    RULE_TITLE+=("$title")
+    RULE_SRC+=("$path")
+  done
+}
+
+# Умолчание перечня: имена правил, копии которых лежат в проекте; копий нет — все.
+default_rules() {
+  local entry name i derived=""
+  if [ -d "$RULES_DIR" ]; then
+    for entry in "$RULES_DIR"/*.md; do
+      if [ ! -f "$entry" ]; then continue; fi
+      name="$(basename "$entry" .md)"
+      for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+        if [ "${RULE_NAME[$i]}" = "$name" ]; then
+          if ! list_has "$derived" "$name"; then derived="$derived $name"; fi
+        fi
+      done
+    done
+  fi
+  derived="${derived# }"
+  if [ -n "$derived" ]; then printf '%s' "$derived"; else all_rules_names; fi
+}
+
+choose_rules() { # перечень по умолчанию
+  local answer token num i name picked known def="$1"
+  say ""
+  say "Правила tessera: копии в $(display "$RULES_DIR"), секция в $(display "$AGENTS_FILE")"
+  for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+    say "  $(( i + 1 )). ${RULE_NAME[$i]} — ${RULE_TITLE[$i]}"
+  done
+  while :; do
+    if [ -n "$def" ]; then
+      ask "Подключить: all, none, номера или имена через запятую, Enter — прежний перечень ($(rules_csv_display "$def")): " answer
+    else
+      ask "Подключить: all, none, номера или имена через запятую, Enter — все правила: " answer
+    fi
+    if [ -z "$answer" ]; then RULES_SEL="$def"; return; fi
+    case "$answer" in
+      [Aa][Ll][Ll]) RULES_SEL="$(all_rules_names)"; return ;;
+      [Nn][Oo][Nn][Ee]) RULES_SEL=""; return ;;
+    esac
+    picked=""
+    known=1
+    for token in $(printf '%s' "$answer" | tr ',' ' '); do
+      name=""
+      case "$token" in
+        *[!0-9]*) ;;
+        *)
+          num="$(printf '%s' "$token" | sed 's/^0*//')"
+          if [ -n "$num" ] && [ "$num" -le "${#RULE_NAME[@]}" ]; then
+            name="${RULE_NAME[$(( num - 1 ))]}"
+          fi
+          ;;
+      esac
+      if [ -z "$name" ]; then
+        for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+          if [ "${RULE_NAME[$i]}" = "$token" ]; then name="$token"; break; fi
+        done
+      fi
+      if [ -z "$name" ]; then
+        say "  не распознано: $token"
+        known=0
+        continue
+      fi
+      if ! list_has "$picked" "$name"; then picked="$picked $name"; fi
+    done
+    if [ "$known" -eq 1 ] && [ -n "$picked" ]; then
+      RULES_SEL="${picked# }"
+      return
+    fi
+    say "  укажите all, none, номера или имена правил из списка."
+  done
+}
+
+# Перечень подключаемых правил: --rules, диалог либо умолчание; неизвестное
+# имя останавливает запуск ошибкой параметров, не меняя проект.
+resolve_rules() {
+  local token i known
+  RULES_SEL=""
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  case "$RULES_ARG" in
+    "")
+      if [ "$INTERACTIVE" -eq 1 ]; then choose_rules "$(default_rules)"; else RULES_SEL="$(default_rules)"; fi
+      ;;
+    all) RULES_SEL="$(all_rules_names)" ;;
+    none) RULES_SEL="" ;;
+    *)
+      for token in $(printf '%s' "$RULES_ARG" | tr ',' ' '); do
+        known=0
+        for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+          if [ "${RULE_NAME[$i]}" = "$token" ]; then known=1; break; fi
+        done
+        if [ "$known" -eq 0 ]; then
+          printf 'Ошибка: неизвестное правило: %s — доступные: %s\n' "$token" "$(rules_csv_display "$(all_rules_names)")" >&2
+          exit 2
+        fi
+        if ! list_has "$RULES_SEL" "$token"; then RULES_SEL="$RULES_SEL $token"; fi
+      done
+      RULES_SEL="${RULES_SEL# }"
+      ;;
+  esac
+}
+
+# Классификация элементов каталога правил до любого изменения проекта: копия
+# исключаемого правила, изменённая вручную, останавливает запуск; чужие элементы
+# остаются на месте и называются в отчёте.
+rules_scan() {
+  RULE_FOREIGN=()
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  [ -d "$RULES_DIR" ] || return 0
+  local entry name rel blockers=0
+  for entry in "$RULES_DIR"/*; do
+    if [ ! -e "$entry" ]; then continue; fi
+    name="$(basename "$entry" .md)"
+    if list_has "$RULES_SEL" "$name"; then continue; fi
+    rel="$(rule_rel "$name")"
+    if [ -f "$STORAGE/tessera/$rel" ] || [ -n "$(git -C "$STORAGE/tessera" log --format=%h -n 1 -- "$rel" </dev/null 2>/dev/null)" ]; then
+      if ! copy_is_ours "$entry" "$rel"; then
+        say "Копия правила изменена вручную и исключается из перечня: $(display "$entry")"
+        blockers=$(( blockers + 1 ))
+      fi
+    elif [ -f "$entry" ] || [ -d "$entry" ]; then
+      RULE_FOREIGN+=("$entry")
+      SKIPPED+=("$entry")
+    fi
+  done
+  if [ "$blockers" -gt 0 ]; then
+    die "перечень правил не сменён: исключаемые копии изменены вручную — верните их в исходное состояние или подключите названные правила"
+  fi
+}
+
+# Секция правил: маркеры со штампом, поставщик и время, перечень ссылками
+# на копии правил. Названия правил — из заголовков источников.
+rules_section_text() { # штамп
+  local stamp="$1" i name list=""
+  for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+    name="${RULE_NAME[$i]}"
+    if list_has "$RULES_SEL" "$name"; then
+      list="$list
+- [${RULE_TITLE[$i]}](./.tessera/rules/$name.md)"
+    fi
+  done
+  cat <<EOF
+${SECTION_OPEN}${stamp} -->
+
+## Правила tessera
+
+Секцию ведёт скрипт поставки tessera: правила подключены $(stamp_human "$stamp"). Правки внутри секции не сохраняются — повторная установка перепишет её. Свои инструкции пишите вне секции.
+
+Перед выполнением любой задачи агент обязан полностью прочитать перечисленные правила:
+$list
+
+${SECTION_CLOSE}${stamp} -->
+EOF
+}
+
+# «none | начало конец штамп» для секции правил файла; damaged — маркер без
+# парного либо секций больше одной.
+find_rules_section() { # файл
+  awk '
+    $0 ~ /^<!-- delivery-tessera-[0-9]{14} -->$/ {
+      nopen++
+      if (nopen == 1) { oline = NR; ostamp = substr($0, 23, 14) }
+    }
+    $0 ~ /^<!-- \/delivery-tessera-[0-9]{14} -->$/ {
+      nclose++
+      if (nclose == 1) { cline = NR; cstamp = substr($0, 24, 14) }
+    }
+    END {
+      if (nopen == 0 && nclose == 0) { print "none"; exit }
+      if (nopen == 1 && nclose == 1 && oline < cline && ostamp == cstamp) {
+        print oline, cline, ostamp; exit
+      }
+      print "damaged"
+    }' "$1"
+}
+
+# Удаляет диапазон строк, схлопывая пустую строку перед секцией с пустой после
+# неё; пустые строки в конце файла убираются, в конце остаётся один перевод
+# строки.
+remove_line_range() { # файл, начало, конец
+  local file="$1"
+  awk -v s="$2" -v e="$3" '
+    NR == s - 1 { if ($0 !~ /^[[:space:]]*$/) print; else hold = 1; next }
+    NR >= s && NR <= e { next }
+    hold && $0 ~ /^[[:space:]]*$/ { hold = 0; print; next }
+    { hold = 0; print }
+  ' "$file" > "$file.tmp"
+  printf '%s\n' "$(cat "$file.tmp")" > "$file"
+  rm -- "$file.tmp"
+}
+
+# Текст созданного скриптом AGENTS.md без секции — по нему файл опознаётся.
+created_agents_text() {
+  printf '# %s\n\nТочка входа правил для агентов, работающих в проекте.\n' "$(basename "$PROJECT_DIR")"
+}
+
+# Секция AGENTS.md: создание файла, запись в конец, замена прежней секции —
+# только при изменении текста; пустой перечень снимает секцию.
+write_rules_section() {
+  local sec start end stamp old_block new_block remainder
+  AGENTS_RESULT=""
+  RULES_STAMP=""
+  if [ ! -n "$RULES_SEL" ]; then
+    if [ -f "$AGENTS_FILE" ]; then
+      sec="$(find_rules_section "$AGENTS_FILE")"
+      if [ "$sec" = "damaged" ]; then
+        die "секция правил в $(display "$AGENTS_FILE") повреждена: маркер без парного либо секций больше одной — приведите файл к одной секции правил"
+      fi
+      if [ "$sec" != "none" ]; then
+        read -r start end stamp <<< "$sec"
+        remove_line_range "$AGENTS_FILE" "$start" "$end"
+        AGENTS_RESULT="снята"
+        RULES_STAMP="$stamp"
+        if [ "$(cat "$AGENTS_FILE")" = "$(created_agents_text)" ]; then
+          rm -- "$AGENTS_FILE"
+          AGENTS_RESULT="снята, файл удалён (создан скриптом)"
+        fi
+      fi
+    fi
+    if [ -d "$RULES_DIR" ]; then rmdir "$RULES_DIR" 2>/dev/null || true; fi
+    if [ -d "${RULES_DIR%/*}" ]; then rmdir "${RULES_DIR%/*}" 2>/dev/null || true; fi
+    return
+  fi
+  RULES_STAMP="$(rule_stamp)"
+  new_block="$(rules_section_text "$RULES_STAMP")"
+  if [ ! -f "$AGENTS_FILE" ]; then
+    { created_agents_text; printf '\n%s\n' "$new_block"; } > "$AGENTS_FILE"
+    AGENTS_RESULT="записана (штамп $RULES_STAMP)"
+    return
+  fi
+  sec="$(find_rules_section "$AGENTS_FILE")"
+  if [ "$sec" = "damaged" ]; then
+    die "секция правил в $(display "$AGENTS_FILE") повреждена: маркер без парного либо секций больше одной — приведите файл к одной секции правил"
+  fi
+  if [ "$sec" = "none" ]; then
+    if [ -n "$(tail -c 1 "$AGENTS_FILE" 2>/dev/null)" ]; then printf '\n' >> "$AGENTS_FILE"; fi
+    if [ -n "$(tail -n 1 "$AGENTS_FILE")" ]; then printf '\n' >> "$AGENTS_FILE"; fi
+    printf '%s\n' "$new_block" >> "$AGENTS_FILE"
+    AGENTS_RESULT="записана (штамп $RULES_STAMP)"
+    return
+  fi
+  read -r start end stamp <<< "$sec"
+  old_block="$(sed -n "${start},${end}p" "$AGENTS_FILE")"
+  if [ "$old_block" = "$(rules_section_text "$stamp")" ]; then
+    AGENTS_RESULT="актуальна (штамп $stamp)"
+    return
+  fi
+  { head -n $(( start - 1 )) "$AGENTS_FILE"; printf '%s\n' "$new_block"; tail -n +$(( end + 1 )) "$AGENTS_FILE"; } > "$AGENTS_FILE.tmp"
+  mv -- "$AGENTS_FILE.tmp" "$AGENTS_FILE"
+  AGENTS_RESULT="записана (штамп $RULES_STAMP)"
+}
+
+# Ссылки подключённых правил на правила вне перечня — только ссылки между
+# правилами (./<имя>.md); ссылки на навык плагина и прочие пути не считаются.
+rule_cross_links() {
+  RULE_LINKS_MISSING=()
+  [ -n "$RULES_SEL" ] || return 0
+  local name entry target
+  for name in $RULES_SEL; do
+    entry="$RULES_DIR/$name.md"
+    if [ ! -f "$entry" ]; then continue; fi
+    for target in $(grep -o '](\.\/[A-Za-z0-9-]*\.md' "$entry" | sed 's/](\.\/\(.*\)\.md/\1/'); do
+      if list_has "$RULES_SEL" "$target"; then continue; fi
+      if ! list_has "$(all_rules_names)" "$target"; then continue; fi
+      if ! list_has "${RULE_LINKS_MISSING[*]-}" "$name|$target"; then
+        RULE_LINKS_MISSING+=("$name|$target")
+      fi
+    done
+  done
+}
+
+# Подключение правил: копии перечня, снятие исключённых и устаревших копий,
+# запись секции, перекрёстные ссылки.
+connect_rules() {
+  RULE_COPY_STATE=()
+  RULE_HAND_EDITED=()
+  RULE_REMOVED=()
+  RULE_LINKS_MISSING=()
+  AGENTS_RESULT=""
+  RULES_STAMP=""
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  local i name entry state
+  if [ -n "$RULES_SEL" ]; then mkdir -p "$RULES_DIR"; fi
+  for i in ${RULE_NAME[@]+"${!RULE_NAME[@]}"}; do
+    name="${RULE_NAME[$i]}"
+    if ! list_has "$RULES_SEL" "$name"; then continue; fi
+    entry="$RULES_DIR/$name.md"
+    if [ ! -e "$entry" ]; then
+      cp -- "${RULE_SRC[$i]}" "$entry"
+      state="создана"
+    elif cmp -s "$entry" "${RULE_SRC[$i]}"; then
+      state="актуальна"
+    elif copy_is_ours "$entry" "$(rule_rel "$name")"; then
+      cp -- "${RULE_SRC[$i]}" "$entry"
+      state="обновлена"
+    else
+      state="пропущена (изменена вручную)"
+      RULE_HAND_EDITED+=("$entry")
+    fi
+    RULE_COPY_STATE+=("$name|$state")
+  done
+  if [ -d "$RULES_DIR" ]; then
+    for entry in "$RULES_DIR"/*; do
+      if [ ! -e "$entry" ]; then continue; fi
+      name="$(basename "$entry" .md)"
+      if list_has "$RULES_SEL" "$name"; then continue; fi
+      rel="$(rule_rel "$name")"
+      if [ -f "$STORAGE/tessera/$rel" ] || [ -n "$(git -C "$STORAGE/tessera" log --format=%h -n 1 -- "$rel" </dev/null 2>/dev/null)" ]; then
+        rm -- "$entry"
+        RULE_REMOVED+=("$name")
+      fi
+    done
+  fi
+  write_rules_section
+  rule_cross_links
+}
+
 # --- Лаунчер backlog -------------------------------------------------------
 
 launcher_is_ours() { [ -f "$LAUNCHER" ] && grep -qF "$LAUNCHER_MARKER" "$LAUNCHER"; }
@@ -557,13 +949,31 @@ skill_counts() {
 }
 
 run_self_check() {
-  local i
+  local i name line
   BROKEN=()
   for i in ${LINK_NAME[@]+"${!LINK_NAME[@]}"}; do
     if [ ! -f "${LINK_DIR[$i]}/${LINK_NAME[$i]}/SKILL.md" ]; then
       BROKEN+=("${LINK_DIR[$i]}/${LINK_NAME[$i]}")
     fi
   done
+  RULE_BROKEN=()
+  if [ "$PROJECT_MODE" -eq 1 ] && [ -n "$RULES_SEL" ]; then
+    for name in $RULES_SEL; do
+      if [ ! -f "$RULES_DIR/$name.md" ]; then
+        RULE_BROKEN+=("$RULES_DIR/$name.md — нет файла копии")
+      fi
+    done
+    for line in ${RULE_COPY_STATE[@]+"${RULE_COPY_STATE[@]}"}; do
+      case "$line" in
+        *"|создана" | *"|обновлена")
+          name="${line%%|*}"
+          if ! cmp -s "$RULES_DIR/$name.md" "$(rule_src_by_name "$name")"; then
+            RULE_BROKEN+=("$RULES_DIR/$name.md — не совпадает с источником")
+          fi
+          ;;
+      esac
+    done
+  fi
   LAUNCHER_CHECK=""
   if profile_has "$PROFILE" formular; then
     LAUNCHER_CHECK=0
@@ -599,6 +1009,26 @@ print_report() {
     fi
     [ -z "$names" ] || wrap_names "$names"
   done
+  if [ "$PROJECT_MODE" -eq 1 ]; then
+    if [ -n "$RULES_SEL" ]; then
+      say "  Правила в проекте $(display "$RULES_DIR"):"
+      for line in ${RULE_COPY_STATE[@]+"${RULE_COPY_STATE[@]}"}; do
+        say "    ${line%%|*} — ${line#*|}"
+      done
+      for line in ${RULE_REMOVED[@]+"${RULE_REMOVED[@]}"}; do
+        say "    $line — копия снята"
+      done
+      say "  Секция правил $(display "$AGENTS_FILE") — $AGENTS_RESULT."
+      if [ "${#RULE_LINKS_MISSING[@]}" -gt 0 ]; then
+        say "  Ссылки на неподключённые правила:"
+        for line in ${RULE_LINKS_MISSING[@]+"${RULE_LINKS_MISSING[@]}"}; do
+          say "    ${line%%|*} → ${line#*|}"
+        done
+      fi
+    else
+      say "  Правила не подключаются: перечень пуст."
+    fi
+  fi
   if [ "${#BROKEN[@]}" -gt 0 ]; then
     say "  Неисправные ссылки:"
     for line in "${BROKEN[@]}"; do say "    $(display "$line") — не разрешается в SKILL.md"; done
@@ -624,7 +1054,7 @@ print_report() {
   else
     say "  Лаунчер не ставится: профиль без backlog."
   fi
-  say "  Самопроверка: ссылок ${#LINK_NAME[@]}, неисправных ${#BROKEN[@]}."
+  say "  Самопроверка: ссылок ${#LINK_NAME[@]}, неисправных ${#BROKEN[@]}, элементов правил ${#RULE_BROKEN[@]}."
 }
 
 describe_plan() {
@@ -644,6 +1074,16 @@ describe_plan() {
   for component in ${DROPPED[@]+"${DROPPED[@]}"}; do
     say "  снимается $component (нет в профиле)"
   done
+  if [ "$PROJECT_MODE" -eq 1 ]; then
+    case "$RULES_ARG" in
+      all) say "  правила    все — копии в $(display "$RULES_DIR"), секция в AGENTS.md" ;;
+      none) say "  правила    не подключаются (--rules none)" ;;
+      "")
+        say "  правила    спрошу после загрузки источников; Enter — прежний перечень или все"
+        ;;
+      *) say "  правила    $(rules_csv_display "$RULES_ARG") — копии в $(display "$RULES_DIR"), секция в AGENTS.md" ;;
+    esac
+  fi
   if profile_has "$PROFILE" formular; then say "  лаунчер   $(display "$LAUNCHER")"; fi
 }
 
@@ -682,13 +1122,20 @@ install_supply() {
   LAUNCHER_BACKUP=""
   LAUNCHER_REMOVED=0
   ensure_sources
+  collect_rules
+  resolve_rules
+  rules_scan
   drop_components
   collect_skills
   link_skills
   if profile_has "$PROFILE" formular; then install_launcher; fi
+  connect_rules
   run_self_check
   print_report
   if [ "${#BROKEN[@]}" -gt 0 ]; then die "самопроверка не пройдена: есть неисправные ссылки"; fi
+  if [ "${#RULE_BROKEN[@]}" -gt 0 ]; then
+    die "самопроверка не пройдена: есть неисправные элементы поставки правил"
+  fi
   if [ "$LAUNCHER_CHECK" = "1" ]; then
     die "самопроверка не пройдена: backlog --help не отвечает через лаунчер (для CLI backlog нужен python3)"
   fi
@@ -699,6 +1146,71 @@ install_supply() {
   say "Готово. Перезапустите сессию харнеса, чтобы он увидел навыки."
 }
 
+# Скан правил проекта перед диалогом удаления: какие копии снимаются молча,
+# какие названы как изменённые вручную, какие оставлены как чужие.
+rules_uninstall_scan() {
+  RULE_UN_HAND=()
+  RULE_UN_LEFT=()
+  RULE_UN_COUNT=0
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  [ -d "$RULES_DIR" ] || return 0
+  local entry name rel
+  for entry in "$RULES_DIR"/*; do
+    if [ ! -f "$entry" ]; then continue; fi
+    name="$(basename "$entry" .md)"
+    rel="$(rule_rel "$name")"
+    if [ -e "$STORAGE/tessera/.git" ]; then
+      if [ -f "$STORAGE/tessera/$rel" ] || [ -n "$(git -C "$STORAGE/tessera" log --format=%h -n 1 -- "$rel" </dev/null 2>/dev/null)" ]; then
+        if copy_is_ours "$entry" "$rel"; then
+          RULE_UN_COUNT=$(( RULE_UN_COUNT + 1 ))
+        else
+          RULE_UN_HAND+=("$entry")
+        fi
+      else
+        RULE_UN_LEFT+=("$entry")
+      fi
+    else
+      RULE_UN_LEFT+=("$entry")
+    fi
+  done
+}
+
+# Снятие секции и копий правил проекта; созданный скриптом AGENTS.md без
+# инструкций проекта удаляется, опустевшие каталоги снимаются.
+rules_uninstall_run() {
+  AGENTS_UN_RESULT=""
+  [ "$PROJECT_MODE" -eq 1 ] || return 0
+  local entry name start end stamp sec removed=0
+  if [ -f "$AGENTS_FILE" ]; then
+    sec="$(find_rules_section "$AGENTS_FILE")"
+    if [ "$sec" != "none" ] && [ "$sec" != "damaged" ]; then
+      read -r start end stamp <<< "$sec"
+      remove_line_range "$AGENTS_FILE" "$start" "$end"
+      AGENTS_UN_RESULT="снята"
+      if [ "$(cat "$AGENTS_FILE")" = "$(created_agents_text)" ]; then
+        rm -- "$AGENTS_FILE"
+        AGENTS_UN_RESULT="снята, файл удалён (создан скриптом)"
+      fi
+    elif [ "$sec" = "damaged" ]; then
+      AGENTS_UN_RESULT="повреждена — не тронута, приведите файл к одной секции правил вручную"
+    fi
+  fi
+  if [ -d "$RULES_DIR" ]; then
+    for entry in "$RULES_DIR"/*; do
+      if [ ! -f "$entry" ]; then continue; fi
+      name="$(basename "$entry" .md)"
+      rel="$(rule_rel "$name")"
+      if [ -e "$STORAGE/tessera/.git" ] && { [ -f "$STORAGE/tessera/$rel" ] || [ -n "$(git -C "$STORAGE/tessera" log --format=%h -n 1 -- "$rel" </dev/null 2>/dev/null)" ]; }; then
+        rm -- "$entry"
+        removed=$(( removed + 1 ))
+      fi
+    done
+    if [ -d "$RULES_DIR" ]; then rmdir "$RULES_DIR" 2>/dev/null || true; fi
+    if [ -d "${RULES_DIR%/*}" ]; then rmdir "${RULES_DIR%/*}" 2>/dev/null || true; fi
+  fi
+  RULE_UN_REMOVED=$removed
+}
+
 uninstall_supply() {
   local target entry removed total=0 component dirty=""
   if [ "$INTERACTIVE" -eq 1 ]; then
@@ -706,6 +1218,14 @@ uninstall_supply() {
     say "Будет удалено:"
     for target in "${TARGETS[@]}"; do say "  ссылки на навыки tessera в $(display "$target")"; done
     if launcher_is_ours; then say "  лаунчер $(display "$LAUNCHER")"; fi
+    if [ "$PROJECT_MODE" -eq 1 ]; then
+      if [ -f "$AGENTS_FILE" ] || [ -d "$RULES_DIR" ]; then
+        say "  секцию правил в $(display "$AGENTS_FILE") и копии правил в $(display "$RULES_DIR")"
+      fi
+      for entry in ${RULE_UN_HAND[@]+"${RULE_UN_HAND[@]}"}; do
+        say "    $(display "$entry") — копия изменена вручную"
+      done
+    fi
     if [ -d "$STORAGE" ]; then
       say "  хранилище $(display "$STORAGE")"
       for component in $(component_names); do
@@ -715,6 +1235,7 @@ uninstall_supply() {
     fi
     if ! confirm "Удалить поставку tessera? [y/N] " no; then say "Отменено, ничего не изменено."; exit 0; fi
   fi
+  rules_uninstall_run
   UNINSTALL_REPORT=()
   for target in ${TARGETS[@]+"${TARGETS[@]}"}; do
     [ -d "$target" ] || continue
@@ -732,6 +1253,18 @@ uninstall_supply() {
   say "Отчёт об удалении"
   say "  Ссылок снято: $total"
   for entry in ${UNINSTALL_REPORT[@]+"${UNINSTALL_REPORT[@]}"}; do say "    $entry"; done
+  if [ "$PROJECT_MODE" -eq 1 ] && [ -n "$AGENTS_UN_RESULT" ]; then
+    say "  Секция правил $(display "$AGENTS_FILE") — $AGENTS_UN_RESULT"
+  fi
+  if [ "$PROJECT_MODE" -eq 1 ] && [ "${RULE_UN_REMOVED:-0}" -gt 0 ]; then
+    say "  Копий правил снято: $RULE_UN_REMOVED"
+  fi
+  for entry in ${RULE_UN_HAND[@]+"${RULE_UN_HAND[@]}"}; do
+    say "    $(display "$entry") — копия изменена вручную, снята"
+  done
+  for entry in ${RULE_UN_LEFT[@]+"${RULE_UN_LEFT[@]}"}; do
+    say "    $(display "$entry") — создан не скриптом, оставлен"
+  done
   if launcher_is_ours; then
     rm -- "$LAUNCHER"
     say "  Лаунчер снят: $(display "$LAUNCHER")"
@@ -764,6 +1297,8 @@ parse_args() {
       --harness=*) HARNESS_ARG="${1#--harness=}"; need_value --harness "$HARNESS_ARG" ;;
       --skills-dir) need_value "$1" "${2:-}"; SKILLS_DIR="$2"; shift ;;
       --skills-dir=*) SKILLS_DIR="${1#--skills-dir=}"; need_value --skills-dir "$SKILLS_DIR" ;;
+      --rules) need_value "$1" "${2:-}"; RULES_ARG="$2"; shift ;;
+      --rules=*) RULES_ARG="${1#--rules=}"; need_value --rules "$RULES_ARG" ;;
       --project) PROJECT_MODE=1 ;;
       --yes) YES=1 ;;
       --uninstall) UNINSTALL=1 ;;
@@ -782,6 +1317,12 @@ parse_args() {
   if [ "$UNINSTALL" -eq 1 ] && [ -n "$PROFILE_ARG" ]; then
     usage_error "--uninstall не сочетается с --profile"
   fi
+  if [ -n "$RULES_ARG" ] && [ "$UNINSTALL" -eq 1 ]; then
+    usage_error "--uninstall не сочетается с --rules"
+  fi
+  if [ -n "$RULES_ARG" ] && [ "$PROJECT_MODE" -eq 0 ]; then
+    usage_error "--rules подключает правила к проекту и требует --project"
+  fi
   case "$SKILLS_DIR" in
     "" | /*) ;;
     *) SKILLS_DIR="$PROJECT_DIR/$SKILLS_DIR" ;;
@@ -799,6 +1340,12 @@ STORAGE="${HOME_DIR}/.local/share/tessera"
 BIN_DIR="${HOME_DIR}/.local/bin"
 LAUNCHER="${BIN_DIR}/backlog"
 
+# Файлы правил проекта: копии правил и секция в точке входа агентов.
+AGENTS_FILE="${PROJECT_DIR}/AGENTS.md"
+RULES_DIR="${PROJECT_DIR}/.tessera/rules"
+SECTION_OPEN="<!-- delivery-tessera-"
+SECTION_CLOSE="<!-- /delivery-tessera-"
+
 # Диалог — только при терминале и без --yes; иначе скрипт ведёт себя как с --yes.
 if [ "$YES" -eq 0 ] && { : </dev/tty; } 2>/dev/null; then INTERACTIVE=1; fi
 
@@ -810,6 +1357,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
   # Хранилище снимается целиком, поэтому свои ссылки разыскиваются и в пользовательских
   # каталогах, когда установка шла в проект.
   for row in "${SELECTED[@]}"; do add_target "$(expand_home "$(field "$row" 4)")"; done
+  rules_uninstall_scan
   uninstall_supply
   exit 0
 fi
