@@ -1,0 +1,23 @@
+# Прогон проверок репозитория: единственный workflow, секретов не требует,
+# токен получает только чтение содержимого. Команды проверок несёт scripts/check.sh —
+# workflow их не повторяет; перечню проверок посвящён раздел «Проверки» CONTRIBUTING.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Проверки репозитория
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Получить репозиторий
+        uses: actions/checkout@v7
+      - name: Проверки
+        run: scripts/check.sh

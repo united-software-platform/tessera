@@ -9,6 +9,7 @@
 [![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-4285F4)](https://github.com/google-gemini/gemini-cli)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-D97757)](https://claude.com/claude-code)
 [![OpenCode](https://img.shields.io/badge/OpenCode-201D1D)](https://opencode.ai)
+[![CI](https://github.com/united-software-platform/tessera/actions/workflows/ci.yml/badge.svg)](https://github.com/united-software-platform/tessera/actions/workflows/ci.yml)
 
 tessera — минимальный инженерный фреймворк: правила работы с репозиториями, процессами
 и построения ПО вместе с навыками, которые их применяют. Гибкий пересмотр
@@ -196,7 +197,8 @@ scripts/install.sh
   только параметром `--project`, секцией в его `AGENTS.md`; другой точки входа у скрипта нет.
   Правила самого репозитория tessera читаются агентами по его [`AGENTS.md`](./AGENTS.md).
 - **Бейджи читают ветку main.** Динамические бейджи версий берут значения из манифестов
-  на `main` GitHub: несопровождённая ветка или локальные правки в бейдж не попадают.
+  на `main` GitHub: несопровождённая ветка или локальные правки в бейдж не попадают. Бейдж
+  прогонов CI показывает последний прогон на `main` — прогон pull request в него не попадает.
 
 ---
 

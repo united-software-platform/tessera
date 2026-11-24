@@ -31,7 +31,9 @@
 | `plugins/tessera-plugin/rules/` | Правила оформления и процесса |
 | `plugins/tessera-plugin/templates/` | Шаблоны операций workflow-fast и workflow, из которых `backlog generate` порождает беклоги |
 | `.claude-plugin/marketplace.json` | Каталог маркетплейса `tessera` (владелец `usp`) в корне репозитория |
+| `.github/workflows/ci.yml` | Прогон CI на GitHub Actions: на push в `main` и на pull request запускает `scripts/check.sh` |
 | `scripts/install.sh` | Скрипт поставки: устанавливает навыки, правила, шаблоны и зависимости в любой харнес, а с `--project` подключает правила к проекту — копии в `.tessera/rules/` и секцию в `AGENTS.md` |
+| `scripts/check.sh` | Скрипт проверок: единый перечень проверок репозитория; его запускает и прогон CI |
 | `scripts/bootstrap.sh` | Локальная регистрация навыков плагина в харнесах |
 | `backlog/` | Следы прогонов операций — порождённые беклоги с отметками исполнения |
 | `openspec/` | Спецификации OpenSpec — процесс разработки самого репозитория; в поставку не входит |
@@ -56,9 +58,11 @@
 | Зависимость | `9cf` (светлый синий) | Чужой плагин, требуемый навыками; тише собственного |
 | Право | `success` (зелёный) | Пермиссивная лицензия |
 | Харнес | Корпоративный цвет технологии: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black), ZCode — чёрный `000000` | Среда, в которой работает поставка |
+| Состояние | Нативные цвета GitHub Actions: `green` — пройден, `red` — не пройден | Состояние прогонов проверок репозитория |
 
-Классовые цвета не пересекаются с семантикой состояний (`green`/`yellow`/`red` зарезервированы
-под «ок / внимание / проблема» — например, для будущего endpoint-бейджа состояния зависимостей).
+Классовые цвета не пересекаются с семантикой состояний: `green`/`yellow`/`red` («ок / внимание /
+проблема») принадлежит классу «Состояние»; нативный бейдж CI рисует эти цвета сам, shields
+для него не используется.
 Новый бейдж получает класс и цвет до вставки в блок; новый класс заводится вместе со строкой
 легенды. Проверено: shields-алиас `informational` совпадает с `blue` — для класса «зависимость»
 используется `9cf`. Бейджи openspec убраны: OpenSpec — процесс разработки самого репозитория,
@@ -71,6 +75,7 @@
 | Версия mattpocock-skills | Зависимость | Манифест `.claude-plugin/plugin.json` репозитория mattpocock/skills (raw-файл на `main`) | Динамический — shields `dynamic/json`, `$.version` | репозиторий mattpocock/skills |
 | Лицензия MIT | Право | Неизменная характеристика | Статический | `https://spdx.org/licenses/MIT.html` |
 | Харнесы (5 статических: ZCode, Codex, Gemini CLI, Claude Code, OpenCode) | Харнес — корпоративный цвет технологии (см. легенду) | Таблица харнесов `scripts/install.sh` — носитель состава поддержки; цвета — бренд-страницы технологий: openai.com/brand, Google Partner Marketing Hub, палитра Anthropic, opencode.ai/brand | Статические | Codex — репозиторий `openai/codex`, Gemini CLI — `google-gemini/gemini-cli`, Claude Code — `claude.com/claude-code`, OpenCode — `opencode.ai`; ZCode — без ссылки, публичной страницы нет |
+| CI (прогон проверок) | Состояние | Прогоны workflow `.github/workflows/ci.yml` на ветке `main` — нативный `badge.svg` GitHub Actions | Динамический — состояние последнего прогона | страница прогонов workflow |
 
 Переименование манифеста или смена пути сломает динамический бейдж — носители значений
 перечислены в таблице. Значения читаются с ветки `main` GitHub.
@@ -78,22 +83,18 @@
 ## Проверки
 
 ```bash
-python3 -m json.tool plugins/tessera-plugin/.zcode-plugin/plugin.json > /dev/null   # манифест ZCode — валидный JSON
-diff plugins/tessera-plugin/.zcode-plugin/plugin.json plugins/tessera-plugin/.claude-plugin/plugin.json  # манифесты идентичны
-bash -n scripts/install.sh                                                            # синтаксис скрипта поставки
-scripts/install.sh --help                                                             # справка скрипта поставки
-scripts/install.sh --registry | python3 -m json.tool > /dev/null                      # реестр поставки — валидный JSON
-FAKE=$(mktemp -d) && HOME="$FAKE" scripts/install.sh --yes --skills-dir "$FAKE/skills"  # дымовой прогон в поддельном домашнем каталоге
-REPO=$PWD && PROJ=$(mktemp -d) && (cd "$PROJ" && HOME=$(mktemp -d) bash "$REPO/scripts/install.sh" --yes --project --skills-dir "$PROJ/skills" --rules documentation-rules) && grep -q 'delivery-tessera-' "$PROJ/AGENTS.md" && rm -rf "$PROJ"   # дымовой прогон установки в проект: секция правил записана
-bash scripts/bootstrap.sh                                                              # локальная регистрация навыков
+scripts/check.sh             # проверки репозитория — тот же перечень исполняет прогон CI
+bash scripts/bootstrap.sh    # локальная регистрация навыков в харнесах, в CI не входит
 ```
 
-Дымовой прогон ставит полный профиль в поддельный домашний каталог: харнесов в нём нет,
-поэтому каталог навыков передаётся явно. Прогон пройден, когда команда отвечает кодом `0`
-и отчёт называет неисправных ссылок `0`; каталог прогона удаляется командой
-`rm -rf "$FAKE"`. Прогон установки в проект дополнительно проверяет подключение правил:
-команда отвечает кодом `0`, а в `AGENTS.md` временного проекта записана секция правил
-со штампом `delivery-tessera-`; его каталог удаляется той же цепочкой.
+Перечень проверок живёт в `scripts/check.sh`: пять статических — манифесты плагина, синтаксис
+и справка скрипта поставки, реестр, — затем два дымовых прогона установки: полный профиль
+в поддельном домашнем каталоге и установка в проект с проверкой секции правил. Дымовые прогоны
+ставят tessera из фиксации `HEAD` репозитория — временным зеркалом с перенаправлением адреса, —
+а зависимости из их репозиториев на GitHub; поэтому правку фиксируют до запуска: незафиксированное
+состояние прогон не видит. Прогон CI запускает тот же скрипт на каждый push в `main`
+и на pull request (`.github/workflows/ci.yml`); состояние прогонов показывает бейдж
+в [`README.md`](./README.md).
 
 ## Правила и процесс
 
@@ -126,3 +127,4 @@ bash scripts/bootstrap.sh                                                       
 | 1.5.0 | 2026-11-24 | TSS-016, OpenSpec change `delivery-registry-json`, задача 4.5 | ZCode | GLM-5.4 | Проверки дополнены реестром поставки: `scripts/install.sh --registry` через `python3 -m json.tool` — валидный JSON |
 | 1.6.0 | 2026-11-24 | Запрос владельца: бейджи харнесов в корпоративных цветах технологий | ZCode | GLM-5.4 | Бейджи харнесов перекрашены из единого классового `blueviolet` в корпоративные цвета технологий: Codex `10A37F` (OpenAI Green), Gemini CLI `4285F4` (Google Blue), Claude Code `D97757` (Anthropic Orange), OpenCode `201D1D` (тёплый near-black); ZCode — классовый `blueviolet`, публичной палитры нет. Легенда и карта бейджей дополнены источниками цветов |
 | 1.6.1 | 2026-11-24 | Решение владельца: ZCode — чёрный | ZCode | GLM-5.4 | Бейдж ZCode перекрашен из классового `blueviolet` в чёрный `000000`; легенда приведена к нему |
+| 1.7.0 | 2026-11-25 | TSS-017, OpenSpec change `github-actions-ci-badge` | ZCode | GLM-5.3-Flash | Раздел «Проверки» переписан на `scripts/check.sh` — единую точку входа: перечень проверок живёт в скрипте, документ называет одну команду. Устройство дополнено строками `.github/workflows/ci.yml` и `scripts/check.sh`. В легенду заведён класс «Состояние» (нативные цвета GitHub Actions), в карту бейджей — строка бейджа прогонов CI |
