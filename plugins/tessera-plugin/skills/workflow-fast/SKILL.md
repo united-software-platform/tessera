@@ -91,10 +91,13 @@ description: Запустить операцию workflow-fast — быстры�
 Отказы передаются владельцу как есть, навык не разбирает их сам и не заводит шаблон:
 
 - навыки `backlog-generate` и `backlog-run` недоступны в харнесе — навык не запускается:
-  владельцу сообщается одна команда установки поставки профилем с backlog и ход останавливается;
+  владельцу сообщается одна команда установки состава с formular и ход останавливается.
+  Состав задаётся точно — поставленное вне перечня снимается, поэтому прочие компоненты
+  вписываются в перечень тоже; поставленный состав печатает `scripts/install.sh --registry`.
+  Если tessera поставлен плагином из маркетплейса, tessera в перечень не включается;
 
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/united-software-platform/tessera/main/scripts/install.sh | bash -s -- --profile backlog
+  curl -fsSL https://raw.githubusercontent.com/united-software-platform/tessera/main/scripts/install.sh | bash -s -- --components tessera,formular
   ```
 
 - шаблона операции нет ни в проекте, ни в поставке плагина — отказ `backlog-generate`;
@@ -117,3 +120,4 @@ description: Запустить операцию workflow-fast — быстры�
 | 1.0.5 | 2026-11-23 | OpenSpec change `define-framework-essence`, задача 3.2 | ZCode | GLM-5.3 | В «Передаче исполнения» добавлена явная ссылка на `rules/git-rules.md`: формат коммита `GIT-009`, коммит и push по явному запросу `GIT-015` |
 | 1.0.6 | 2026-11-23 | TSS-012, OpenSpec change `optional-plugin-supply`, задача 2.1 | ZCode | GLM-5.3 | Зависимость backlog переведена на опциональную поставку: из отказа убрана установка записью каталога маркетплейса `tessera`, осталась установка из маркетплейса `formular` напрямую |
 | 1.1.0 | 2026-11-24 | OpenSpec change `single-install-script`, задача 2.2 | ZCode | GLM-5.4 | Навык переведён на скрипт поставки: зависимость зовётся по короткому имени (`backlog-generate`, `backlog-run`) и признаётся по имени с префиксом плагина; отказ называет одну команду установки с профилем `backlog`; добавлен шаг «Выбрать каталог шаблонов» — вызов порождения передаёт `--templates`: шаблон операции в проекте приоритетнее поставленного с плагином, путь к поставленному разрешается через `realpath`; порядок работы дополнен командами `realpath` и `backlog generate` |
+| 1.2.0 | 2026-11-25 | OpenSpec change `component-wise-delivery`, задача 3.1 | ZCode | GLM-5.3-Flash | Отказ переведён с профиля на состав: одна команда `--components tessera,formular` с предупреждением о точном составе — поставленное вне перечня снимается, поставленный состав печатает `--registry`, плагинный tessera в перечень не включается; шаг проверки зависимости и порядок работы не менялись |

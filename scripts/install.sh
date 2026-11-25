@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Скрипт поставки tessera — единый механизм установки для любого харнеса.
 # Источники раскладываются клонами ветки main в хранилище ~/.local/share/tessera/,
-# навыки связываются симлинками с каталогами навыков найденных харнесов, для backlog
-# ставится лаунчер на PATH. С параметром --project правила плагина копируются в
-# .tessera/rules/ проекта и подключаются секцией в AGENTS.md. Средства харнесов
-# для установки плагинов не используются.
+# навыки связываются симлинками с каталогами навыков найденных харнесов; лаунчер
+# backlog ставится, когда в составе есть formular. Состав задаёт --components,
+# область установки — --scope project|user, правила к проекту — --rules; без
+# параметров ставятся все компоненты в пользовательской области. С областью
+# project правила плагина копируются в .tessera/rules/ проекта и подключаются
+# секцией в AGENTS.md. Средства харнесов для установки плагинов не используются.
 # Запускается из клона (scripts/install.sh) или одной командой (curl ... | bash):
 # клон служит только способом получить скрипт, источники всегда берутся из репозиториев.
 
@@ -37,7 +39,9 @@ HARNESSES=(
   "opencode|~/.config/opencode|opencode|~/.config/opencode/skills|.agents/skills"
 )
 
-PROFILE_ARG=""
+COMPONENTS_ARG=""
+SCOPE_ARG=""
+SCOPE="user"
 HARNESS_ARG=""
 SKILLS_DIR=""
 RULES_ARG=""
@@ -68,21 +72,24 @@ usage() {
 
 Скрипт поставки tessera — единый механизм установки для любого харнеса: источники
 раскладываются клонами ветки main в хранилище ~/.local/share/tessera/, навыки
-связываются симлинками с каталогами навыков найденных харнесов, для backlog ставится
-лаунчер ~/.local/bin/backlog. Запуск из клона даёт тот же результат.
+связываются симлинками с каталогами навыков найденных харнесов. Без параметров
+ставятся все компоненты таблицы в пользовательской области. Запуск из клона даёт
+тот же результат.
 
 Параметры:
 
   Параметр                         Действие                                   Умолчание
-  --profile full|backlog|tessera   состав установки                          full
-                                  full — tessera, backlog и mattpocock-skills
-                                  backlog — tessera и backlog
-                                  tessera — только tessera
-  --project                        регистрация в текущем проекте             пользовательские каталоги
+  --components <список>            состав поставки: имена компонентов         все компоненты
+                                  через запятую; ставится точно —
+                                  поставленное вне перечня снимается
+  --scope project|user             область установки: каталоги навыков        user
+                                  текущего проекта или пользовательские
+                                  каталоги харнесов
   --rules all|none|<список>        какие правила подключить к проекту        все (в проекте
-                                  с --project: копии в .tessera/rules/      с копиями — прежний
-                                  и секция в AGENTS.md; имена — имена       перечень)
-                                  файлов правил без .md через запятую
+                                  (только с --scope project: копии          с копиями — прежний
+                                  в .tessera/rules/ и секция в AGENTS.md;   перечень)
+                                  имена — имена файлов правил без .md
+                                  через запятую)
   --harness <список>               ограничить харнесы через запятую          все найденные
   --skills-dir <путь>              дополнительный каталог навыков            —
   --registry                       печатать реестр поставки в JSON и выйти   —
@@ -90,8 +97,13 @@ usage() {
   --uninstall                      удалить созданное скриптом                —
   -h, --help                       справка                                   —
 
-Повторный запуск обновляет клоны и пересоздаёт ссылки; профиль прежней установки
-сохраняется, пока параметр --profile не задал иной. Секция правил AGENTS.md
+Компоненты (имя | что приносит):
+  tessera            навыки, правила и шаблоны плагина tessera-plugin
+  formular           плагин backlog: навыки backlog-generate, backlog-run,
+                     backlog-template и команда backlog
+  mattpocock-skills  навыки инжиниринга из каталогов engineering и productivity
+
+Повторный запуск обновляет клоны и пересоздаёт ссылки. Секция правил AGENTS.md
 переписывается, когда её текст изменился; отключённый (--rules none) перечень
 не запоминается — без --rules следующий запуск снова предложит прежний перечень
 копий, а без копий — все правила.
@@ -189,40 +201,43 @@ component_names() {
   for row in "${COMPONENTS[@]}"; do printf '%s ' "$(field "$row" 1)"; done
 }
 
-# --- Профили ---------------------------------------------------------------
+# --- Состав поставки --------------------------------------------------------
 
-profile_components() { # профиль → компоненты через пробел
-  case "$1" in
-    full) printf '%s' "tessera formular mattpocock-skills" ;;
-    backlog) printf '%s' "tessera formular" ;;
-    tessera) printf '%s' "tessera" ;;
-  esac
+# Перечень компонентов таблицы через запятую — для справки и сообщений об ошибках.
+components_csv() { rules_csv_display "$(component_names)"; }
+
+# Состав запуска: перечень --components в порядке называния; без перечня — все
+# компоненты таблицы. Имена проверены в parse_args; здесь строится WANTED.
+resolve_components() {
+  WANTED=()
+  if [ -z "$COMPONENTS_ARG" ]; then
+    local row
+    for row in "${COMPONENTS[@]}"; do WANTED+=("$(field "$row" 1)"); done
+    return 0
+  fi
+  local token
+  for token in $(printf '%s' "$COMPONENTS_ARG" | tr ',' ' '); do
+    if ! list_has "$(printf '%s ' ${WANTED[@]+"${WANTED[@]}"})" "$token"; then
+      WANTED+=("$token")
+    fi
+  done
+  return 0
 }
 
-profile_summary() {
-  case "$1" in
-    full) printf '%s' "tessera, backlog и mattpocock-skills" ;;
-    backlog) printf '%s' "tessera и backlog" ;;
-    tessera) printf '%s' "только tessera" ;;
-  esac
-}
-
-profile_has() { # профиль, компонент
+# Вхождение компонента в состав запуска.
+composition_has() { # компонент
   local component
-  for component in $(profile_components "$1"); do
-    if [ "$component" = "$2" ]; then return 0; fi
+  for component in ${WANTED[@]+"${WANTED[@]}"}; do
+    if [ "$component" = "$1" ]; then return 0; fi
   done
   return 1
 }
 
-# Профиль прежней установки выводится из хранилища: есть клон formular — backlog выбран,
-# есть клон mattpocock-skills — полный набор. Пусто, когда установки не было.
-installed_profile() {
-  if [ -d "$STORAGE/mattpocock-skills" ]; then printf '%s' full
-  elif [ -d "$STORAGE/formular" ]; then printf '%s' backlog
-  elif [ -d "$STORAGE/tessera" ]; then printf '%s' tessera
-  fi
-  return 0
+# Перечень состава через запятую — для отчёта и плана.
+composition_csv() {
+  local component out=""
+  for component in ${WANTED[@]+"${WANTED[@]}"}; do out="$out $component"; done
+  rules_csv_display "${out# }"
 }
 
 # --- Диалог ----------------------------------------------------------------
@@ -248,24 +263,6 @@ confirm() { # приглашение, умолчание
     [yY] | [yY][eE][sS]) return 0 ;;
     *) return 1 ;;
   esac
-}
-
-choose_profile() { # профиль по умолчанию
-  local answer
-  say ""
-  say "Профиль поставки:"
-  say "  full     — tessera, backlog и mattpocock-skills"
-  say "  backlog  — tessera и backlog"
-  say "  tessera  — только tessera"
-  while :; do
-    ask "Профиль [$1]: " answer
-    answer="$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')"
-    case "$answer" in
-      "") PROFILE="$1"; return ;;
-      full | backlog | tessera) PROFILE="$answer"; return ;;
-      *) say "Введите full, backlog или tessera." ;;
-    esac
-  done
 }
 
 # Входит ли слово в перечень через пробел.
@@ -385,7 +382,7 @@ remove_storage_dir() { # путь
   rm -rf -- "$1"
 }
 
-# Приводит клоны профиля к ветке main: новый клон либо git pull --ff-only.
+# Приводит клоны состава к ветке main: новый клон либо git pull --ff-only.
 # Клон с локальными изменениями не обновляется, а называется в отчёте.
 ensure_sources() {
   local component url dir output
@@ -420,8 +417,8 @@ ensure_sources() {
   done
 }
 
-# Клоны в хранилище, которых нет в профиле, снимаются: параметры запуска
-# переопределяют состав прежней установки. Свои ссылки разыскиваются и во всех
+# Клоны в хранилище, которых нет в составе запуска, снимаются: параметры запуска
+# переопределяют состав. Свои ссылки разыскиваются и во всех
 # пользовательских каталогах таблицы — хранилище общее для всех установок.
 drop_components() {
   local component target entry removed
@@ -448,7 +445,7 @@ drop_components() {
   TARGETS=("${kept[@]}")
 }
 
-# Навыки источников профиля — каталоги с SKILL.md в клонах хранилища.
+# Навыки источников состава — каталоги с SKILL.md в клонах хранилища.
 collect_skills() {
   local component sub dir path names=""
   SKILL_COMPONENT=()
@@ -462,7 +459,7 @@ collect_skills() {
         if [ ! -f "${path}SKILL.md" ]; then continue; fi
         path="${path%/}"
         if list_has "$names" "${path##*/}"; then
-          die "имя навыка ${path##*/} встречается в двух источниках профиля"
+          die "имя навыка ${path##*/} встречается в двух источниках состава"
         fi
         names="$names ${path##*/}"
         SKILL_COMPONENT+=("$component")
@@ -959,23 +956,15 @@ registry_path() {
   esac
 }
 
-# Профиль реестра: параметр запуска, иначе профиль прежней установки, иначе full.
-registry_profile() {
-  if [ -n "$PROFILE_ARG" ]; then printf '%s' "$PROFILE_ARG"; return; fi
-  local p
-  p="$(installed_profile)"
-  printf '%s' "${p:-full}"
-}
-
-# Раздел компонентов: все компоненты таблицы с признаком вхождения в профиль
-# и состоянием клона (есть и редакция / нет).
+# Раздел компонентов: все компоненты таблицы с признаком вхождения в состав
+# запуска и состоянием клона (есть и редакция / нет).
 registry_components() {
   local component out="" first=1 included present rev
   for component in $(component_names); do
     included=false
     present=false
     rev=null
-    if profile_has "$PROFILE" "$component"; then included=true; fi
+    if composition_has "$component"; then included=true; fi
     if [ -d "$STORAGE/$component/.git" ]; then
       present=true
       local r
@@ -1007,12 +996,12 @@ registry_skill_dirs() {
   printf '%s' "$out"
 }
 
-# Компоненты профиля, чьих клонов нет в хранилище, — через пробел. Отдельная
+# Компоненты состава, чьих клонов нет в хранилище, — через пробел. Отдельная
 # функция: вызывается в родителе, а не в подстановке команды, чтобы результат
 # не терялся в под-оболочке.
 registry_pending_components() {
   local component sub pending=""
-  for component in $(profile_components "$PROFILE"); do
+  for component in ${WANTED[@]+"${WANTED[@]}"}; do
     for sub in $(component_skill_dirs "$component"); do
       if [ ! -d "$STORAGE/$component/$sub" ]; then
         list_has "$pending" "$component" || pending="$pending $component"
@@ -1027,7 +1016,7 @@ registry_pending_components() {
 registry_skills_entries() {
   local t component sub dir path out="" first=1
   for t in ${TARGETS[@]+"${TARGETS[@]}"}; do
-    for component in $(profile_components "$PROFILE"); do
+    for component in ${WANTED[@]+"${WANTED[@]}"}; do
       for sub in $(component_skill_dirs "$component"); do
         dir="$STORAGE/$component/$sub"
         [ -d "$dir" ] || continue
@@ -1104,8 +1093,7 @@ registry_entrypoint() { # штамп или пусто
 # пустой аргумент означает префлайт: печать без записи на диск.
 build_registry() { # штамп или пусто
   local stamp="${1:-}"
-  PROFILE="$(registry_profile)"
-  read -r -a WANTED <<< "$(profile_components "$PROFILE")"
+  resolve_components
   local now skills_status="" skills_pending_json="" rules_part="" entrypoint_json=""
   now="$(date +%Y-%m-%dT%H:%M:%S)"
   local comp_json dirs_json skills_json pending
@@ -1131,12 +1119,11 @@ build_registry() { # штамп или пусто
     fi
   fi
   local launcher_included=false
-  profile_has "$PROFILE" formular && launcher_included=true
+  if composition_has formular; then launcher_included=true; fi
   REGISTRY_TEXT="{
-  \"registry_version\": \"1.0.0\",
+  \"registry_version\": \"2.0.0\",
   \"generated_at\": \"$(json_escape "$now")\",
-  \"profile\": $(json_str "$PROFILE"),
-  \"mode\": \"$([ "$PROJECT_MODE" -eq 1 ] && printf project || printf user)\",
+  \"scope\": \"$SCOPE\",
   \"components\": [$comp_json],
   \"skill_dirs\": [$dirs_json],
   \"skills\": {
@@ -1211,7 +1198,7 @@ run_self_check() {
     done
   fi
   LAUNCHER_CHECK=""
-  if profile_has "$PROFILE" formular; then
+  if composition_has formular; then
     LAUNCHER_CHECK=0
     "$LAUNCHER" --help >/dev/null 2>&1 || LAUNCHER_CHECK=1
   fi
@@ -1221,12 +1208,12 @@ print_report() {
   local line target i names count broken_here
   say ""
   say "Отчёт об установке"
-  say "  Профиль поставки: $PROFILE — $(profile_summary "$PROFILE")."
+  say "  Состав поставки: $(composition_csv)."
   say "  Хранилище $(display "$STORAGE"):"
   for line in "${SOURCE_STATE[@]}"; do
     say "    ${line%%|*} — ${line#*|}"
   done
-  say "  Навыков в профиле: ${#SKILL_NAME[@]} ($(skill_counts))."
+  say "  Навыков в составе: ${#SKILL_NAME[@]} ($(skill_counts))."
   say "  Ссылки на навыки: создано $CREATED, пересоздано $RECREATED."
   for target in "${TARGETS[@]}"; do
     names="" count=0 broken_here=0
@@ -1278,17 +1265,17 @@ print_report() {
     for line in "${STALE[@]}"; do say "    $(display "$line")"; done
   fi
   for line in ${DROPPED_REPORT[@]+"${DROPPED_REPORT[@]}"}; do
-    say "  Снято при смене профиля: ${line%%|*} — клон удалён, ссылок снято ${line#*|}."
+    say "  Снято при смене состава: ${line%%|*} — клон удалён, ссылок снято ${line#*|}."
   done
-  if profile_has "$PROFILE" formular; then
+  if composition_has formular; then
     say "  Лаунчер $(display "$LAUNCHER") — backlog --help: код $LAUNCHER_CHECK."
     if [ -n "$LAUNCHER_BACKUP" ]; then
       say "  Прежний лаунчер сохранён: $(display "$LAUNCHER_BACKUP")."
     fi
   elif [ "$LAUNCHER_REMOVED" -eq 1 ]; then
-    say "  Лаунчер снят: профиль без backlog."
+    say "  Лаунчер снят: состав без formular."
   else
-    say "  Лаунчер не ставится: профиль без backlog."
+    say "  Лаунчер не ставится: состав без formular."
   fi
   say "  Самопроверка: ссылок ${#LINK_NAME[@]}, неисправных ${#BROKEN[@]}, элементов правил ${#RULE_BROKEN[@]}."
 }
@@ -1297,7 +1284,7 @@ describe_plan() {
   local row component
   say ""
   say "Будет сделано:"
-  say "  профиль   $PROFILE — $(profile_summary "$PROFILE")"
+  say "  состав    $(composition_csv)"
   if [ "$PROJECT_MODE" -eq 1 ]; then
     say "  каталоги  навыков в проекте $(display "$PROJECT_DIR"):"
   else
@@ -1308,7 +1295,7 @@ describe_plan() {
   done
   if [ -n "$SKILLS_DIR" ]; then say "            дополнительно $(display "$SKILLS_DIR")"; fi
   for component in ${DROPPED[@]+"${DROPPED[@]}"}; do
-    say "  снимается $component (нет в профиле)"
+    say "  снимается $component (нет в составе)"
   done
   if [ "$PROJECT_MODE" -eq 1 ]; then
     case "$RULES_ARG" in
@@ -1320,28 +1307,22 @@ describe_plan() {
       *) say "  правила    $(rules_csv_display "$RULES_ARG") — копии в $(display "$RULES_DIR"), секция в AGENTS.md" ;;
     esac
   fi
-  if profile_has "$PROFILE" formular; then say "  лаунчер   $(display "$LAUNCHER")"; fi
+  if composition_has formular; then say "  лаунчер   $(display "$LAUNCHER")"; fi
 }
 
 # --- Установка и удаление --------------------------------------------------
 
 install_supply() {
-  local installed dropped
-  if [ -n "$PROFILE_ARG" ]; then
-    PROFILE="$PROFILE_ARG"
-  else
-    installed="$(installed_profile)"
-    if [ "$INTERACTIVE" -eq 1 ]; then choose_profile "${installed:-full}"; else PROFILE="${installed:-full}"; fi
-  fi
-  read -r -a WANTED <<< "$(profile_components "$PROFILE")"
+  local dropped
+  resolve_components
   DROPPED=()
   for dropped in $(component_names); do
-    if [ -d "$STORAGE/$dropped" ] && ! profile_has "$PROFILE" "$dropped"; then DROPPED+=("$dropped"); fi
+    if [ -d "$STORAGE/$dropped" ] && ! composition_has "$dropped"; then DROPPED+=("$dropped"); fi
   done
   # Клон с локальными изменениями не удаляется молча.
   for dropped in ${DROPPED[@]+"${DROPPED[@]}"}; do
     if [ -e "$STORAGE/$dropped/.git" ] && clone_is_dirty "$dropped"; then
-      die "профиль не сменён: в клоне $dropped есть локальные изменения — верните клон в исходное состояние или снимите поставку параметром --uninstall"
+      die "состав не сменён: в клоне $dropped есть локальные изменения — верните клон в исходное состояние или снимите поставку параметром --uninstall"
     fi
   done
   if [ "$INTERACTIVE" -eq 1 ]; then
@@ -1364,7 +1345,7 @@ install_supply() {
   drop_components
   collect_skills
   link_skills
-  if profile_has "$PROFILE" formular; then install_launcher; fi
+  if composition_has formular; then install_launcher; fi
   connect_rules
   run_self_check
   print_report
@@ -1377,7 +1358,7 @@ install_supply() {
   if [ "$LAUNCHER_CHECK" = "1" ]; then
     die "самопроверка не пройдена: backlog --help не отвечает через лаунчер (для CLI backlog нужен python3)"
   fi
-  if profile_has "$PROFILE" formular && ! bin_dir_on_path; then
+  if composition_has formular && ! bin_dir_on_path; then
     warn "$(display "$BIN_DIR") вне PATH — добавьте каталог в PATH, чтобы команда backlog была доступна."
   fi
   say ""
@@ -1530,8 +1511,10 @@ need_value() { # параметр, значение
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
-      --profile) need_value "$1" "${2:-}"; PROFILE_ARG="$2"; shift ;;
-      --profile=*) PROFILE_ARG="${1#--profile=}"; need_value --profile "$PROFILE_ARG" ;;
+      --components) need_value "$1" "${2:-}"; COMPONENTS_ARG="$2"; shift ;;
+      --components=*) COMPONENTS_ARG="${1#--components=}"; need_value --components "$COMPONENTS_ARG" ;;
+      --scope) need_value "$1" "${2:-}"; SCOPE_ARG="$2"; shift ;;
+      --scope=*) SCOPE_ARG="${1#--scope=}"; need_value --scope "$SCOPE_ARG" ;;
       --harness) need_value "$1" "${2:-}"; HARNESS_ARG="$2"; shift ;;
       --harness=*) HARNESS_ARG="${1#--harness=}"; need_value --harness "$HARNESS_ARG" ;;
       --skills-dir) need_value "$1" "${2:-}"; SKILLS_DIR="$2"; shift ;;
@@ -1539,29 +1522,49 @@ parse_args() {
       --rules) need_value "$1" "${2:-}"; RULES_ARG="$2"; shift ;;
       --rules=*) RULES_ARG="${1#--rules=}"; need_value --rules "$RULES_ARG" ;;
       --registry) REGISTRY=1 ;;
-      --project) PROJECT_MODE=1 ;;
       --yes) YES=1 ;;
       --uninstall) UNINSTALL=1 ;;
       -h | --help) usage; exit 0 ;;
       --) shift; break ;;
+      --profile) usage_error "параметр --profile снят — состав задаёт --components" ;;
+      --profile=*) usage_error "параметр --profile снят — состав задаёт --components" ;;
+      --project) usage_error "параметр --project снят — область задаёт --scope project" ;;
       -*) usage_error "неизвестный параметр: $1" ;;
       *) usage_error "неизвестный аргумент: $1" ;;
     esac
     shift
   done
   if [ $# -gt 0 ]; then usage_error "неизвестный аргумент: $1"; fi
-  case "$PROFILE_ARG" in
-    "" | full | backlog | tessera) ;;
-    *) usage_error "неизвестный профиль: $PROFILE_ARG — full, backlog или tessera" ;;
+  case "$SCOPE_ARG" in
+    "" | project | user) ;;
+    *) usage_error "неизвестная область: $SCOPE_ARG — project или user" ;;
   esac
-  if [ "$UNINSTALL" -eq 1 ] && [ -n "$PROFILE_ARG" ]; then
-    usage_error "--uninstall не сочетается с --profile"
+  SCOPE="${SCOPE_ARG:-user}"
+  if [ "$SCOPE" = "project" ]; then PROJECT_MODE=1; fi
+  if [ -n "$COMPONENTS_ARG" ]; then
+    local token known component has_tessera=0
+    for token in $(printf '%s' "$COMPONENTS_ARG" | tr ',' ' '); do
+      known=0
+      for component in $(component_names); do
+        if [ "$component" = "$token" ]; then known=1; break; fi
+      done
+      if [ "$known" -eq 0 ]; then
+        usage_error "неизвестный компонент: $token — доступные: $(components_csv)"
+      fi
+      if [ "$token" = "tessera" ]; then has_tessera=1; fi
+    done
+    if [ "$SCOPE" = "project" ] && [ "$has_tessera" -eq 0 ]; then
+      usage_error "область project подключает правила tessera — добавьте tessera в перечень --components"
+    fi
+  fi
+  if [ "$UNINSTALL" -eq 1 ] && [ -n "$COMPONENTS_ARG" ]; then
+    usage_error "--uninstall не сочетается с --components"
   fi
   if [ -n "$RULES_ARG" ] && [ "$UNINSTALL" -eq 1 ]; then
     usage_error "--uninstall не сочетается с --rules"
   fi
-  if [ -n "$RULES_ARG" ] && [ "$PROJECT_MODE" -eq 0 ]; then
-    usage_error "--rules подключает правила к проекту и требует --project"
+  if [ -n "$RULES_ARG" ] && [ "$SCOPE" != "project" ]; then
+    usage_error "--rules подключает правила к проекту и требует --scope project"
   fi
   if [ "$REGISTRY" -eq 1 ] && [ "$UNINSTALL" -eq 1 ]; then
     usage_error "--registry не сочетается с --uninstall"
