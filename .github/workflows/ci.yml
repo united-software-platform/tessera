@@ -19,5 +19,7 @@ jobs:
     steps:
       - name: Получить репозиторий
         uses: actions/checkout@v7
+      - name: Установить mise
+        uses: jdx/mise-action@v2
       - name: Проверки
         run: scripts/check.sh

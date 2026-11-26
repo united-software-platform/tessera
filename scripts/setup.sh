@@ -397,6 +397,61 @@ bin_dir_on_path() {
   return 1
 }
 
+# --- Навыки OpenSpec --------------------------------------------------------
+
+# Регистрирует навыки OpenSpec в области установки: инициализация с перечнем отобранных
+# харнесов (область project — проектная, user — пользовательская). Существующий
+# openspec/config.yaml не перезаписывается — язык задаёт конфигурация репозитория,
+# а служебные секции, дописываемые инициализацией, снимаются и возвращаются;
+# повторный запуск идемпотентен. CLI закреплён в mise.toml и ставится через mise;
+# без mise используется openspec из PATH, без обоих — предупреждение.
+register_openspec_skills() {
+  OPENSPEC_RESULT=""
+  if [ "$PLUGIN_ONLY" -eq 1 ]; then
+    OPENSPEC_RESULT="пропущено (--plugin-only)"
+    return 0
+  fi
+  local row tools="" scope_arg conf_save="" conf="$PROJECT_DIR/openspec/config.yaml"
+  if [ "${#SELECTED[@]}" -eq 0 ]; then
+    OPENSPEC_RESULT="пропущено: харнесы не отобраны"
+    return 0
+  fi
+  for row in ${SELECTED[@]+"${SELECTED[@]}"}; do tools="$tools,$(field "$row" 1)"; done
+  tools="${tools#,}"
+  if [ "$SCOPE" = "user" ]; then scope_arg="global"; else scope_arg="project"; fi
+  if [ -f "$conf" ]; then
+    conf_save="$(mktemp)"
+    cp -- "$conf" "$conf_save"
+  fi
+  if command -v mise >/dev/null 2>&1; then
+    mise install
+    if ! mise exec -- openspec init --tools "$tools" --scope "$scope_arg" --no-animation --no-copilot-cloud >/dev/null; then
+      restore_openspec_config
+      die "не удалось зарегистрировать навыки OpenSpec"
+    fi
+  elif command -v openspec >/dev/null 2>&1; then
+    if ! openspec init --tools "$tools" --scope "$scope_arg" --no-animation --no-copilot-cloud >/dev/null; then
+      restore_openspec_config
+      die "не удалось зарегистрировать навыки OpenSpec"
+    fi
+  else
+    restore_openspec_config
+    warn "mise и openspec не найдены — навыки OpenSpec не зарегистрированы; CLI закреплён в mise.toml"
+    OPENSPEC_RESULT="пропущено: нет mise и openspec"
+    return 0
+  fi
+  restore_openspec_config
+  OPENSPEC_RESULT="зарегистрированы: $tools (область $scope_arg)"
+}
+
+# Возвращает снятую конфигурацию OpenSpec на место — при любом исходе инициализации.
+restore_openspec_config() {
+  [ -n "$conf_save" ] || return 0
+  cp -- "$conf_save" "$conf"
+  rm -f -- "$conf_save"
+  conf_save=""
+}
+
 # --- Отчёт -----------------------------------------------------------------
 
 # Перечень имён навыков с переносом строк.
@@ -463,6 +518,7 @@ print_report() {
       say "  Прежний лаунчер сохранён: $(display "$LAUNCHER_BACKUP")."
     fi
   fi
+  say "  Навыки OpenSpec — ${OPENSPEC_RESULT:-не регистрировались}."
   say "  Самопроверка: ссылок ${#LINK_NAME[@]}, неисправных ${#BROKEN[@]}."
 }
 
@@ -478,6 +534,7 @@ setup_run() {
   collect_skills
   link_skills
   if wanted_has formular; then install_launcher; fi
+  register_openspec_skills
   run_self_check
   print_report
   if [ "${#BROKEN[@]}" -gt 0 ]; then die "самопроверка не пройдена: есть неисправные ссылки"; fi
