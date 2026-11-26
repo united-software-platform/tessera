@@ -388,6 +388,10 @@ smoke_setup_variants() {
     { cat "$TMP/setup-user.log"; return 1; }
   [ -L "$SETUP2/.agents/skills/project-docs" ] || { say "  нет ссылки навыка плагина в ~/.agents/skills"; return 1; }
   [ -L "$SETUP2/.claude/skills/project-docs" ] || { say "  нет ссылки навыка плагина в ~/.claude/skills"; return 1; }
+  [ -d "$SETUP2/.agents/skills/openspec-propose" ] || { say "  нет навыка OpenSpec в ~/.agents/skills"; return 1; }
+  [ -d "$SETUP2/.claude/skills/openspec-propose" ] || { say "  нет навыка OpenSpec в ~/.claude/skills"; return 1; }
+  [ "$(cat "$REPO/openspec/config.yaml")" = "$(git -C "$REPO" show HEAD:openspec/config.yaml)" ] ||
+    { say "  openspec/config.yaml репозитория изменён"; return 1; }
 }
 
 check "дымовой прогон — локальная настройка: полный состав, tessera нет в хранилище" smoke_setup_full
