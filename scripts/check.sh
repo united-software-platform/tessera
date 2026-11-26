@@ -140,6 +140,49 @@ skills_refusals() {
   grep -q -- '--components' plugins/tessera-plugin/skills/workflow-grill/SKILL.md || return 1
 }
 
+# Сверка объявления предмета: каждый носитель для агентов открывается канонической строкой
+# своего предмета — единственной и сразу после заголовка (PLG-003, PLG-004). Для README
+# строкам до объявления разрешено быть блоком бейджей; навыкам — YAML-фронтматтером.
+# Перечень носителей живёт только здесь.
+subject_check_file() { # файл, предмет
+  local file="$1" subject="$2" mark line before stripped
+  if [ "$subject" = "продукт" ]; then
+    mark='**Предмет:** продукт — уровень предмета: что описывается, поведение компонента.'
+  else
+    mark='**Предмет:** разработка продукта — уровень работы над предметом: как этот предмет создаётся, правила и процесс.'
+  fi
+  # Блоки кода не считаются: правило норм цитирует канонические строки как примеры.
+  stripped="$(awk '/^```/{in_block = !in_block; next} !in_block' "$file")"
+  line="$(printf '%s\n' "$stripped" | grep -n -m1 -x -F "$mark" | cut -d: -f1)"
+  if [ -z "$line" ]; then
+    say "  $file — нет канонического объявления предмета «$subject»"
+    return 1
+  fi
+  if [ "$(printf '%s\n' "$stripped" | grep -c -x -F "$mark")" -ne 1 ]; then
+    say "  $file — объявление предмета «$subject» не единственно"
+    return 1
+  fi
+  before="$(printf '%s\n' "$stripped" | head -n $(( line - 1 )))"
+  if printf '%s\n' "$before" | grep -qv -E '^$|^#|^---$|^[a-zA-Z-]+:|^\[!\[|^!\['; then
+    say "  $file — объявление предмета стоит не сразу после заголовка"
+    return 1
+  fi
+}
+
+subject_declarations() {
+  local f
+  for f in plugins/tessera-plugin/rules/*.md \
+           plugins/tessera-plugin/skills/*/SKILL.md \
+           plugins/tessera-plugin/README.md \
+           README.md \
+           docs/use-cases.md; do
+    subject_check_file "$f" "продукт" || return 1
+  done
+  for f in AGENTS.md CONTRIBUTING.md GLOSSARY.md; do
+    subject_check_file "$f" "разработка" || return 1
+  done
+}
+
 check "манифест ZCode — валидный JSON" manifest_zcode_json
 check "манифесты ZCode и Claude Code — идентичны" manifests_identical
 check "скрипт поставки — синтаксис" install_script_syntax
@@ -149,6 +192,76 @@ check "реестр поставки — состав перечнем комп�
 check "реестр поставки — без параметров все компоненты" registry_all_components
 check "скрипт поставки — снятые и неверные параметры отвергаются" rejected_params
 check "навыки — отказы называют состав, снятых параметров нет" skills_refusals
+check "описания для агентов — предмет объявлен канонически" subject_declarations
+
+# --- Скрипт локальной настройки ---------------------------------------------
+
+# Сторож общих блоков локальной настройки: функции, скопированные из scripts/install.sh,
+# и таблица харнесов сверяются дословно; строки зависимостей setup.sh — ровно строки
+# COMPONENTS скрипта поставки без tessera. Перечень общих функций живёт только здесь.
+common_block() { # файл, имя функции
+  awk -v fn="$2" '
+    index($0, fn"() {") == 1 {
+      print
+      if (/\}$/) exit
+      p = 1
+      next
+    }
+    p { print }
+    p && /^}/ { exit }
+  ' "$1"
+}
+
+setup_shared_blocks() {
+  local fn a b
+  for fn in canonical display expand_home last_line \
+            field harness_row harness_is_found harness_target \
+            component_row component_url component_skill_dirs component_names \
+            list_has add_target compute_targets select_harnesses \
+            clone_is_dirty remove_storage_dir ensure_sources \
+            remove_stale_links link_skills free_backup_path launcher_is_ours \
+            install_launcher bin_dir_on_path wrap_names; do
+    a="$(common_block scripts/install.sh "$fn")"
+    if [ -z "$a" ]; then
+      say "  в scripts/install.sh нет функции $fn — обновите перечень общих функций"
+      return 1
+    fi
+    b="$(common_block scripts/setup.sh "$fn")"
+    if [ "$a" != "$b" ]; then
+      say "  общая функция разошлась: $fn"
+      return 1
+    fi
+  done
+  a="$(awk '/^HARNESSES=\(/,/^\)/' scripts/install.sh)"
+  b="$(awk '/^HARNESSES=\(/,/^\)/' scripts/setup.sh)"
+  if [ "$a" != "$b" ]; then
+    say "  таблица харнесов разошлась со скриптом поставки"
+    return 1
+  fi
+  a="$(awk '/^COMPONENTS=\(/,/^\)/' scripts/install.sh | grep '^  "' | grep -v '"tessera|')"
+  b="$(awk '/^COMPONENTS=\(/,/^\)/' scripts/setup.sh | grep '^  "')" 
+  if [ "$a" != "$b" ]; then
+    say "  строки компонентов зависимостей не совпадают со скриптом поставки"
+    return 1
+  fi
+}
+
+setup_script_syntax() {
+  bash -n scripts/setup.sh
+}
+
+setup_script_help() {
+  HOME="$PROJ_HOME" scripts/setup.sh --help > /dev/null
+}
+
+setup_rejected_params() {
+  expect_reject "project или user" --scope local
+}
+
+check "скрипт настройки — синтаксис" setup_script_syntax
+check "скрипт настройки — справка" setup_script_help
+check "скрипт настройки — общие блоки со скриптом поставки идентичны" setup_shared_blocks
+check "скрипт настройки — неверные параметры отвергаются" setup_rejected_params
 
 # --- Дымовые прогоны -----------------------------------------------------------
 
@@ -230,5 +343,55 @@ fi
 check "дымовой прогон — смена состава: сужение и возврат" smoke_shrink_and_restore
 check "дымовой прогон — установка в проект, секция правил записана" smoke_project_install
 
+# --- Дымовые прогоны локальной настройки --------------------------------------
+
+# Локальная настройка не видит харнесов настоящего HOME: признаков в поддельном
+# домашнем каталоге нет, и цель задаёт --skills-dir. Зависимости клонируются
+# из своих репозиториев на GitHub, навыки плагина — из рабочего дерева проверок.
+SETUP_HOME="$TMP/home-setup"
+SETUP2="$TMP/home-setup2"
+
+smoke_setup_full() {
+  local before
+  mkdir -p "$SETUP_HOME/skills"
+  before="$(git -C "$REPO" status --porcelain)"
+  HOME="$SETUP_HOME" scripts/setup.sh --skills-dir "$SETUP_HOME/skills" >"$TMP/setup-full.log" 2>&1 ||
+    { cat "$TMP/setup-full.log"; return 1; }
+  [ ! -e "$SETUP_HOME/.local/share/tessera/tessera" ] || { say "  клон tessera не должен появляться"; return 1; }
+  [ -d "$SETUP_HOME/.local/share/tessera/formular" ] || { say "  клона formular нет"; return 1; }
+  [ -d "$SETUP_HOME/.local/share/tessera/mattpocock-skills" ] || { say "  клона mattpocock-skills нет"; return 1; }
+  [ "$(readlink -f "$SETUP_HOME/skills/project-docs")" = "$REPO/plugins/tessera-plugin/skills/project-docs" ] ||
+    { say "  ссылка навыка плагина ведёт не в рабочее дерево"; return 1; }
+  HOME="$SETUP_HOME" "$SETUP_HOME/.local/bin/backlog" --help >/dev/null 2>&1 ||
+    { say "  лаунчер backlog не отвечает"; return 1; }
+  [ ! -e "$REPO/.tessera" ] || { say "  каталог .tessera/ не должен появляться"; return 1; }
+  [ "$(git -C "$REPO" status --porcelain)" = "$before" ] || { say "  состояние репозитория изменилось"; return 1; }
+}
+
+smoke_setup_variants() {
+  mkdir -p "$SETUP2/skills"
+  HOME="$SETUP2" scripts/setup.sh --plugin-only --skills-dir "$SETUP2/skills" >"$TMP/setup-plugin-only.log" 2>&1 ||
+    { cat "$TMP/setup-plugin-only.log"; return 1; }
+  [ ! -e "$SETUP2/.local/share/tessera" ] || { say "  хранилище не должно создаваться с --plugin-only"; return 1; }
+  [ ! -e "$SETUP2/.local/bin" ] || { say "  лаунчер не должен ставиться с --plugin-only"; return 1; }
+  [ -L "$SETUP2/skills/workflow-fast" ] || { say "  ссылки навыка плагина нет с --plugin-only"; return 1; }
+  HOME="$SETUP2" scripts/setup.sh --skills-dir "$SETUP2/skills" >"$TMP/setup-full2.log" 2>&1 ||
+    { cat "$TMP/setup-full2.log"; return 1; }
+  HOME="$SETUP2" scripts/setup.sh --uninstall --skills-dir "$SETUP2/skills" >"$TMP/setup-uninstall.log" 2>&1 ||
+    { cat "$TMP/setup-uninstall.log"; return 1; }
+  [ ! -e "$SETUP2/skills/project-docs" ] || { say "  ссылка навыка плагина должна быть снята"; return 1; }
+  [ ! -e "$SETUP2/skills/backlog-generate" ] || { say "  ссылка зависимости должна сниматься в области project"; return 1; }
+  [ -d "$SETUP2/.local/share/tessera/formular" ] || { say "  хранилище должно остаться после удаления"; return 1; }
+  [ -f "$SETUP2/.local/bin/backlog" ] || { say "  лаунчер должен остаться после удаления"; return 1; }
+  mkdir -p "$SETUP2/.zcode" "$SETUP2/.claude"
+  HOME="$SETUP2" scripts/setup.sh --scope user >"$TMP/setup-user.log" 2>&1 ||
+    { cat "$TMP/setup-user.log"; return 1; }
+  [ -L "$SETUP2/.agents/skills/project-docs" ] || { say "  нет ссылки навыка плагина в ~/.agents/skills"; return 1; }
+  [ -L "$SETUP2/.claude/skills/project-docs" ] || { say "  нет ссылки навыка плагина в ~/.claude/skills"; return 1; }
+}
+
+check "дымовой прогон — локальная настройка: полный состав, tessera нет в хранилище" smoke_setup_full
+check "дымовой прогон — локальная настройка: --plugin-only, удаление, область user" smoke_setup_variants
+
 say ""
-say "Все проверки пройдены: 12 из 12."
+say "Все проверки пройдены: 19 из 19."

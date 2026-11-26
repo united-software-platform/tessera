@@ -11,6 +11,8 @@
 [![OpenCode](https://img.shields.io/badge/OpenCode-201D1D)](https://opencode.ai)
 [![CI](https://github.com/united-software-platform/tessera/actions/workflows/ci.yml/badge.svg)](https://github.com/united-software-platform/tessera/actions/workflows/ci.yml)
 
+**Предмет:** продукт — уровень предмета: что описывается, поведение компонента.
+
 tessera — минимальный инженерный фреймворк: правила работы с репозиториями, процессами
 и построения ПО вместе с навыками, которые их применяют. Гибкий пересмотр
 [sdd-developer-kit](https://github.com/united-software-platform/sdd-developer-kit) — та же
@@ -34,7 +36,7 @@ tessera — минимальный инженерный фреймворк: пр
   без прожарки;
 - навык `workflow-grill` — рабочий процесс: от требования до ветки изменений через прожарку;
 - правила — документация, чтение документов, окружение, чистая архитектура, CQRS, DDD,
-  документы проекта, git-процесс; в области `--scope project` скрипт копирует выбранные
+  документы проекта, git-процесс, нормы классов ПО; в области `--scope project` скрипт копирует выбранные
   правила в `.tessera/rules/` проекта и подключает секцией в его `AGENTS.md`, а после
   установки они применяются навыками: точка входа — `tessera-plugin`, профильные навыки
   ссылаются на свои правила сами;
@@ -78,7 +80,7 @@ tessera — все компоненты, область «user»
 │                          tdd · teach · to-questionnaire · to-spec · to-tickets
 │                          triage · wait-what · wayfinder · wizard · writing-for-agents
 └── в области project добавляется в проект:
-    ├── .tessera/rules/                  копии правил: все 8 или выбранные
+    ├── .tessera/rules/                  копии правил: все 9 или выбранные
     └── AGENTS.md                        секция delivery-tessera-<штамп>
 ```
 
@@ -97,13 +99,14 @@ scripts/install.sh --registry | python3 -m json.tool
 реестром в `registry.json` рядом с хранилищем, а в области project — ещё и в `.tessera/`
 проекта.
 
-Разработка самого tessera ведётся через OpenSpec (каталог `openspec/`); в поставку он
-не входит.
+Разработка самого tessera ведётся через OpenSpec; каталог `openspec/` — процесс разработки
+репозитория и в поставку не входит. Порядок работы над репозиторием описывает
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 Что делают навыки на практике и примеры вызовов — [кейсы 7–9](./docs/use-cases.md),
 установка только в один проект, состав поставки до установки, подключение части правил,
 поставка без зависимостей, смена состава и обновление кнопкой — кейсы 1–6
 там же. Здесь — путь
-от одной команды до первого работающего навыка. Правящим репозиторий —
+от одной команды до первого работающего навыка. Контрибьюторам —
 [`CONTRIBUTING.md`](./CONTRIBUTING.md), агентам, работающим в репозитории, —
 [`AGENTS.md`](./AGENTS.md).
 
