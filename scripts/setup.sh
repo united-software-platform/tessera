@@ -404,7 +404,9 @@ bin_dir_on_path() {
 # openspec/config.yaml не перезаписывается — язык задаёт конфигурация репозитория,
 # а служебные секции, дописываемые инициализацией, снимаются и возвращаются;
 # повторный запуск идемпотентен. CLI закреплён в mise.toml и ставится через mise;
-# без mise используется openspec из PATH, без обоих — предупреждение.
+# без mise используется openspec из PATH, без обоих — предупреждение. Переменная
+# CLAUDE_CONFIG_DIR снимается: каскад mise workspace может указывать ей чужой
+# недоступный каталог, а регистрация идёт в каталоги харнесов текущего пользователя.
 register_openspec_skills() {
   OPENSPEC_RESULT=""
   if [ "$PLUGIN_ONLY" -eq 1 ]; then
@@ -425,12 +427,12 @@ register_openspec_skills() {
   fi
   if command -v mise >/dev/null 2>&1; then
     mise install
-    if ! mise exec -- openspec init --tools "$tools" --scope "$scope_arg" --no-animation --no-copilot-cloud >/dev/null; then
+    if ! mise exec -- env -u CLAUDE_CONFIG_DIR openspec init --tools "$tools" --scope "$scope_arg" --no-animation --no-copilot-cloud >/dev/null; then
       restore_openspec_config
       die "не удалось зарегистрировать навыки OpenSpec"
     fi
   elif command -v openspec >/dev/null 2>&1; then
-    if ! openspec init --tools "$tools" --scope "$scope_arg" --no-animation --no-copilot-cloud >/dev/null; then
+    if ! env -u CLAUDE_CONFIG_DIR openspec init --tools "$tools" --scope "$scope_arg" --no-animation --no-copilot-cloud >/dev/null; then
       restore_openspec_config
       die "не удалось зарегистрировать навыки OpenSpec"
     fi
